@@ -1,0 +1,145 @@
+# This is a tinyPico32
+# Currently being used to prototype a eTape reader
+# https://www.adafruit.com/product/464
+# Vref on GPIO32, ADC1 channel 4
+# Vsens on GPIO33, ADC1 channel 5
+# Vbatt on GPIO35, ADC2 channel 0
+# I'm using the Voltage Divider setup per their app note using 470 ohm 
+# resistors as pull-ups to the 3.3 rail
+# DS18B20 on  gpio5
+substitutions:
+  name: pico1
+  update_interval: 10s
+
+esphome:
+  name: ${name}
+  platform: ESP32
+  board: tinypico
+  comment: "tinyPico32"
+
+wifi:
+  ssid: !secret ssid2
+  password: !secret password2
+#  power_save_mode: none
+#  reboot_timeout: 0s
+#  manual_ip:
+#    static_ip: 192.168.2.164
+#    gateway: 192.168.2.1
+#    subnet: 255.255.255.0
+
+logger:
+  level: debug
+  logs:
+    sensor: info
+
+#api:
+#  reboot_timeout: 0s #remove when talking to ha
+  
+ota:
+
+#prometheus:
+
+mqtt:
+  broker: !secret mqtt_broker
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  id: mqtt_client  
+  on_message:
+    - topic: ${name}/deepsleep
+      payload: 'OFF'
+      then:
+        - deep_sleep.prevent: sleeper
+        - logger.log: Sleep disabled
+    - topic: ${name}/deepsleep
+      payload: 'ON'
+      then:
+        - logger.log: Sleeping
+        - deep_sleep.enter: sleeper
+
+      
+web_server:
+  port: 80
+
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: America/Chicago
+
+deep_sleep:
+  id: sleeper
+  run_duration: 5s
+  sleep_duration: 2min
+  
+
+switch:
+  - platform: restart
+    name: ${name} restart
+
+  - platform: gpio
+    name: "dotstar_power"
+    pin:
+      number: 13
+      inverted: yes
+    id: relay
+    icon: "mdi:power-socket-us"
+
+sensor:
+  - platform: uptime
+    name: ${name} uptime
+    update_interval: ${update_interval}
+    
+  - platform: wifi_signal
+    name: ${name} wifi signal
+    update_interval: ${update_interval}
+
+  - platform: adc
+    # TinyPICO has a 442k/160k divider connecting GPIO35 to Vbatt
+    # Vbat = GPIO35 * (442+160)/160 = 3.762 * GPIO35
+    # measured on this unit its more like 3.35
+    pin: GPIO35
+    name: Vbat
+    attenuation: 2.5db # full scale is 1.5V
+    update_interval: ${update_interval}
+    unit_of_measurement: "VDC"
+    filters:
+      - calibrate_linear:
+        # map adc reading to true value
+        - 0.0 -> 0.0
+        - 1.12 -> 4.13
+
+
+  - platform: dallas
+    address: 0xAB01142F6FA19628
+    name: "${name} temperature"
+    accuracy_decimals: 2
+    filters:
+    - lambda: return x * (9.0/5.0) + 32.0;
+    unit_of_measurement: °F
+
+
+light:
+  - platform: fastled_spi
+    chipset: APA102
+    data_pin: GPIO2
+    clock_pin: GPIO12
+    num_leds: 1
+    rgb_order: BGR
+    name: "rgb_led"
+    effects:
+      - addressable_rainbow:
+      - addressable_rainbow:
+          name: Rainbow Effect With Custom Values
+          speed: 10
+          width: 512
+      - addressable_rainbow:
+          name: Rainbow mega fast
+          speed: 20
+          width: 150
+      - addressable_color_wipe:
+      - addressable_scan:
+      - addressable_twinkle:
+      - addressable_fireworks:
+
+dallas:
+  - pin: GPIO5
+    update_interval: ${update_interval}

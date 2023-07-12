@@ -1,0 +1,77 @@
+# This is for a ElectroDragon dimmer operating in RGB mode
+# https://www.electrodragon.com/product/esp-led-strip-board/
+# IO0: on board flash button
+# IO14: W
+# IO12: B
+# IO13: G
+# IO15: R
+# IO16: status LED
+substitutions:
+  name: "porch-fairies"
+
+esphome:
+  name: ${name}
+  platform: ESP8266
+  board: esp01_1m
+  comment: "ElectroDragon"
+
+wifi:
+  ssid: !secret ssid2
+  password: !secret password2
+
+prometheus:
+
+web_server:
+  port: 80
+
+logger:
+
+api:
+
+ota:
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+    timezone: America/Chicago
+
+
+text_sensor:
+  - platform: version
+    name: "ESPHome Version"
+
+
+switch:
+  - platform: restart
+    name: "${name} restart"
+
+
+sensor:
+  - platform: uptime
+    name: ${name} uptime
+    update_interval: 120s
+    
+  - platform: wifi_signal
+    name: ${name} wifi signal
+    update_interval: 120s
+    
+
+output:
+  - platform: esp8266_pwm
+    pin: GPIO12
+    frequency: 1000 Hz
+    id: blue_pwm
+
+  - platform: esp8266_pwm
+    pin: GPIO15
+    frequency: 1000 Hz
+    id: green_pwm
+    
+light:
+  - platform: monochromatic
+    name: "N. Porch fairies"
+    output: blue_pwm
+
+  - platform: monochromatic
+    name: "S. Porch fairies"
+    output: green_pwm

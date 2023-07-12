@@ -1,0 +1,174 @@
+# hardware tinyPico esp32 with a elegoo 8 Channel DC 5V Relay module
+# https://www.elegoo.com/products/elegoo-8-channel-relay-module-kit
+# DS18B20 Temperature sensors on GPIO27
+# PENN P598RCP 0-100 psi 0.4 to 4.5V out on GPIO32 (ADC1 CH4)
+# Relay board inputs
+# 1 - gnd -> gnd
+# 2 - IN1 -> GPIO21
+# 3 - IN2 -> GPIO22
+# 4 - IN3 -> GPIO5
+# 5 - IN4 -> GPIO18
+# 6 - IN5 -> GPIO19
+# 7 - IN6 -> GPIO23
+# 8 - IN7 -> GPIO14
+# 9 - IN8 -> GPIO4
+# 10 - Vcc -> Vcc
+#
+# Protoboard terminals
+# J1 - Vcc  -> power supply +5VDC
+# J2 - Gnd  -> power supply ground
+# J3 - Vcc  -> to pressure sensor Vcc
+# J4 - Vpsens -> to pressure sensor output -> 10k/33k divider -> GPIO32 (ADC1 CH4)
+# J5 - Gnd -> to pressure sensor gound
+# J6 - Vcc -> to DS18B20 buss Vcc
+# J7 - D0  -> to DS18B20 buss D0 -> GPIO27
+# J8 - Gnd -> to DS18B20 buss ground
+#
+
+substitutions:
+  name: well-temps
+
+esphome:
+  name: ${name}
+  platform: ESP32
+  board: tinypico
+  comment: "tinyPico32"
+
+wifi:
+  ssid: !secret ssid2
+  password: !secret password2
+
+logger:
+
+api:
+
+ota:
+
+prometheus:
+
+web_server:
+  port: 80
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+    timezone: America/Chicago
+
+text_sensor:
+  - platform: version
+    name: "ESPHome Version"
+
+switch:
+  - platform: restart
+    name: ${name} restart
+
+  - platform: gpio
+    name: Pool hose
+    pin:
+      number: 21
+      inverted: yes
+    id: k1
+    icon: "mdi:valve"
+  - platform: gpio
+    name: Garden hose
+    pin:
+      number: 22
+      inverted: yes
+    id: k2
+    icon: mdi:valve
+  - platform: gpio
+    name: Spare hose
+    pin:
+      number: 5
+      inverted: yes
+    id: k3
+    icon: mdi:valve
+  - platform: gpio
+    name: Lawn left
+    pin:
+      number: 18
+      inverted: yes
+    id: k4
+    icon: mdi:valve
+  - platform: gpio
+    name: Lawn right
+    pin:
+      number: 19
+      inverted: yes
+    id: k5
+    icon: mdi:valve
+
+  - platform: gpio
+    name: dotstar_power
+    pin:
+      number: 13
+      inverted: yes
+    internal: true
+
+sensor:
+  - platform: uptime
+    name: ${name} uptime
+    update_interval: 120s
+
+  - platform: wifi_signal
+    name: ${name} wifi signal
+    update_interval: 120s
+
+  - platform: dallas
+    address: 0xBF01193A06BCF028
+    name: Well plumbing temperature
+    accuracy_decimals: 2
+    filters:
+    - lambda: return x * (9.0/5.0) + 32.0;
+    unit_of_measurement: °F
+
+  - platform: adc
+    pin: GPIO32
+    id: v_adc
+    internal: true
+    attenuation: 0db # full scale is 1.1V
+    update_interval: 10s
+    unit_of_measurement: "VDC"
+    accuracy_decimals: 3
+    filters:
+      - calibrate_linear:
+        # map adc reading to true value
+        # true values were from fluke 114
+        - 0.000 -> 0.050
+        - 0.010 -> 0.079
+        - 0.033 -> 0.104
+        - 0.091 -> 0.155
+        - 0.148 -> 0.203
+        - 0.232 -> 0.282
+        - 0.306 -> 0.347
+        - 0.383 -> 0.415
+        - 0.477 -> 0.500
+        - 0.544 -> 0.563
+        - 0.641 -> 0.647
+        - 0.705 -> 0.703
+        - 0.828 -> 0.816
+        - 0.928 -> 0.906
+        - 1.010 -> 0.972
+        - 1.036 -> 0.998
+        - 1.062 -> 1.020
+        - 1.089 -> 1.046
+
+  - platform: template
+    name: Well pressure
+    accuracy_decimals: 1
+    update_interval: 10s
+    # V_min=0.5, V_max=4.5, P_max = 100 psi
+    # G1 = P_max / (V_max - V_min) =  25 psi/V
+    # P = G1 * (V_pressure - V_min)
+    # R1=10k, R2=33k
+    # G2 = 10/(10+33) = 0.2325 V/V
+    # V_adc == V_pressure * 0.2325
+    # P = G1 * (V_adc/G2 - V_min)
+    # manually corrected v_min to give 0 psi at ambient
+    # manually corrected G1 to make P match analog gauge at
+    lambda: return 25 * (4.01*id(v_adc).state - 0.43);
+    unit_of_measurement: "psi"
+
+
+dallas:
+  - pin: GPIO27

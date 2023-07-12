@@ -1,0 +1,101 @@
+# This is for a sonoff S31 power measuring socket (not the lite version)
+substitutions:
+  name: "back-tap-tapes"
+
+esphome:
+  name: ${name}
+  platform: ESP8266
+  board: esp01_1m
+  comment: "Sonoff S31"
+
+wifi:
+  ssid: !secret ssid2
+  password: !secret password2
+
+prometheus:
+
+web_server:
+  port: 80
+
+logger:
+  baud_rate: 0 # required for the cse7766 to work
+  level: info
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "Pl8WeeEqzJ07UpawKB4YVIQKWBx2pJpTqXOQNlOUAYM="
+
+ota:
+  password: "bff5f4b132c436d1a87c80d25baadced"
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+    timezone: America/Chicago
+
+text_sensor:
+  - platform: version
+    name: "ESPHome Version"
+
+switch:
+  - platform: restart
+    name: "${name} restart"
+
+  - platform: gpio
+    name: "${name} relay"
+    pin: GPIO12
+    restore_mode: RESTORE_DEFAULT_ON
+    id: relay
+    icon: "mdi:power-socket-us"
+
+sensor:
+  - platform: uptime
+    name: ${name} uptime
+    update_interval: 120s
+    
+  - platform: wifi_signal
+    name: ${name} wifi signal
+    update_interval: 120s
+    
+  - platform: cse7766
+    current:
+      name: "${name} current"
+      accuracy_decimals: 2
+      filters:
+        multiply: 0.951
+    voltage:
+      name: "${name} voltage"
+      accuracy_decimals: 1
+    power:
+      name: "${name} power"
+      id: power
+      accuracy_decimals: 0
+      filters:
+        multiply: 0.951
+    update_interval: 15s
+
+  - platform: total_daily_energy
+    name: ${name} daily energy
+    power_id: power
+    filters:
+      - multiply: 0.001
+    unit_of_measurement: kWh
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO0
+      mode: INPUT_PULLUP
+      inverted: True
+    name: "${name} button"
+    on_press:
+      - switch.toggle: relay
+
+status_led:
+  pin: GPIO13
+
+uart:
+  rx_pin: RX
+  baud_rate: 4800
+

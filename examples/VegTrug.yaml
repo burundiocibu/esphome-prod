@@ -1,0 +1,27 @@
+
+esp32_ble_tracker:
+
+sensor:
+  - platform: uptime
+    name: ${name} uptime
+    update_interval: 30s
+    
+  - platform: wifi_signal
+    name: ${name} wifi signal
+    update_interval: 30s
+
+  - platform: xiaomi_gcls002
+    mac_address: 'C4:7C:8D:6B:93:81'
+    temperature:
+      name: "Bitsy Temperature"
+    moisture:
+      name: "Bitsy Moisture"
+    illuminance:
+      name: "Bitsy Illuminance"
+    conductivity:
+      name: "Bitsy Soil Conductivity"
+
+  - platform: ble_rssi
+    mac_address: C4:7C:8D:6B:93:81
+    name: "Bitsy rssi"
+

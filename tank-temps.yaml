@@ -1,0 +1,87 @@
+# hardware wemos d1-mini with a string of DS18B20 sensors
+substitutions:
+  name: tank-temps
+
+esphome:
+  name: ${name}
+  platform: ESP8266
+  board: d1_mini
+  comment: "wemos d1-mini"
+
+wifi:
+  ssid: !secret ssid2
+  password: !secret password2
+
+logger:
+
+api:
+
+ota:
+  password: "98990a48086e1c416ed715916cea6066"
+
+prometheus:
+
+web_server:
+  port: 80
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+    timezone: America/Chicago
+
+text_sensor:
+  - platform: version
+    name: "ESPHome Version"
+
+switch:
+  - platform: restart
+    name: ${name} restart
+
+sensor:
+  - platform: uptime
+    name: ${name} uptime
+    update_interval: 120s
+
+  - platform: wifi_signal
+    name: ${name} wifi signal
+    update_interval: 120s
+
+  - platform: dallas
+    address: 0x590119387D980028
+    name: ${name} temperature 1
+    accuracy_decimals: 2
+    filters:
+    - lambda: return x * (9.0/5.0) + 32.0;
+    unit_of_measurement: °F
+
+  - platform: dallas
+    address: 0xC00119387D765A28
+    name: ${name} temperature 2
+    accuracy_decimals: 2
+    filters:
+    - lambda: return x * (9.0/5.0) + 32.0;
+    unit_of_measurement: °F
+
+  - platform: dallas
+    address: 0x70011939F989F928
+    name: ${name} temperature 3
+    accuracy_decimals: 2
+    filters:
+    - lambda: return x * (9.0/5.0) + 32.0;
+    unit_of_measurement: °F
+
+  - platform: dallas
+    address: 0xFB011939FFAF1328
+    name: ${name} temperature 4
+    accuracy_decimals: 2
+    filters:
+    - lambda: return x * (9.0/5.0) + 32.0;
+    unit_of_measurement: °F
+
+
+dallas:
+  pin:
+    number: D3
+    mode:
+      input: true
+      pullup: true

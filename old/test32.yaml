@@ -1,0 +1,73 @@
+# This is a WROOM module in wemos-d1 form factor
+substitutions:
+  name: test32
+  update_interval: 15s
+
+esphome:
+  name: ${name}
+  platform: ESP32
+  board: esp-wrover-kit
+
+wifi:
+  ssid: !secret ssid2
+  password: !secret password2
+  use_address: 192.168.2.200
+  power_save_mode: none
+  reboot_timeout: 0s
+#  manual_ip:
+#    static_ip: 192.168.2.200
+#    gateway: 192.168.2.1
+#    subnet: 255.255.255.0
+
+logger:
+  level: verbose
+
+#api:
+
+ota:
+
+prometheus:
+
+web_server:
+  port: 80
+
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: America/Chicago
+
+
+text_sensor:
+  - platform: version
+    name: "ESPHome Version"
+
+
+switch:
+  - platform: restart
+    name: ${name} restart
+
+
+sensor:
+  - platform: uptime
+    name: ${name} uptime
+    update_interval: 30s
+    
+  - platform: wifi_signal
+    name: ${name} wifi signal
+    update_interval: 30s
+
+  - platform: adc
+    # TinyPICO has a 442k/160k divider connecting GPIO35 to Vbatt
+    # Vbat = GPIO35 * (442+160)/160 = 3.762 * GPIO35
+    # measured on this unit its more like 3.35
+    pin: GPIO35
+    name: Vbat
+    attenuation: 2.5db # full scale is 1.5V
+    update_interval: ${update_interval}
+    unit_of_measurement: "VDC"
+    filters:
+      - calibrate_linear:
+        # map adc reading to true value
+        - 0.0 -> 0.0
+        - 1.14 -> 3.92
+        - 1.21 -> 4.04

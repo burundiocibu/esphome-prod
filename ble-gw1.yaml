@@ -1,0 +1,61 @@
+substitutions:
+  name: ble-gw1
+  update_interval: 15s
+
+esphome:
+  name: ${name}
+  platform: ESP32
+  board: esp32dev
+  comment: "pico1"
+
+wifi:
+  ssid: !secret ssid2
+  password: !secret password2
+
+logger:
+  level: info
+
+api:
+
+ota:
+
+prometheus:
+
+web_server:
+  port: 80
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+    timezone: America/Chicago
+
+text_sensor:
+  - platform: version
+    name: "ESPHome Version"
+
+switch:
+  - platform: restart
+    name: ${name} restart
+
+dallas:
+  - pin: 14
+    update_interval: 15s
+
+sensor:
+  - platform: uptime
+    name: ${name} uptime
+    update_interval: 120s
+    
+  - platform: wifi_signal
+    name: ${name} wifi signal
+    update_interval: 120s
+  
+  - platform: dallas
+    address: 0xb23c01d07579b428
+    name: porch-0 temperature
+    accuracy_decimals: 2
+    filters:
+    - lambda: return x * (9.0/5.0) + 32.0;
+    unit_of_measurement: °F
+
+

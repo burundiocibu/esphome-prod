@@ -1,0 +1,170 @@
+# Hardware is a ESP32-WROOM-32U module on a
+# Circuit Setup 6 ch monitor' v1.4 rev 1
+# https://circuitsetup.us/index.php/product/expandable-6-channel-esp32-energy-meter/
+substitutions:
+  name: "main_panel"
+  update_interval: 15s
+  current_cal: '41996'
+  voltage_cal: '7305'
+
+esphome:
+  name: main-panel
+  platform: ESP32
+  board: esp32-pro
+  comment: "ESP32-WROOM-32U"
+
+wifi:
+  ssid: !secret ssid2
+  password: !secret password2
+
+logger:
+  level: info
+
+api:
+
+ota:
+
+prometheus:
+
+web_server:
+  port: 80
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+    timezone: America/Chicago
+
+
+text_sensor:
+  - platform: version
+    name: "ESPHome Version"
+
+
+switch:
+  - platform: restart
+    name: ${name} restart
+
+
+sensor:
+  - platform: uptime
+    name: ${name} uptime
+    update_interval: 120s
+    
+  - platform: wifi_signal
+    name: ${name} wifi signal
+    update_interval: 120s
+
+  - platform: atm90e32
+    cs_pin: 5
+    chip_temperature:
+      name: ic1Temperature
+    phase_a:
+      gain_voltage: ${voltage_cal}
+      voltage:
+        name: ${name} voltage a
+        id: ic1Volts
+        accuracy_decimals: 1
+      gain_ct: ${current_cal}
+      current:
+#        name: ${name} ct1 current
+        id: ct1Amps
+    phase_b:
+      gain_ct: ${current_cal}
+      current:
+#        name: ${name} ct2 current
+        id: ct2Amps
+
+    phase_c:
+      current:
+#        name: ${name} ct3 current
+        id: ct3Amps
+      gain_ct: ${current_cal}
+    frequency:
+      name: ${name} frequency a
+      accuracy_decimals: 2
+    line_frequency: 60Hz
+    gain_pga: 1X
+    update_interval: ${update_interval}
+
+  - platform: atm90e32
+    cs_pin: 4
+    phase_a:
+      voltage:
+#        name: ${name} voltage b
+        id: ic2Volts
+        accuracy_decimals: 1
+      current:
+#        name: ${name} ct4 current
+        id: ct4Amps
+      gain_voltage: ${voltage_cal}
+      gain_ct: ${current_cal}
+
+    phase_b:
+      current:
+#        name: ${name} ct5 current
+        id: ct5Amps
+      gain_ct: ${current_cal}
+    phase_c:
+      current:
+#        name: ${name} ct6 current
+        id: ct6Amps
+      gain_ct: ${current_cal}
+    frequency:
+      name: ${name} frequency b
+      accuracy_decimals: 2
+    line_frequency: 60Hz
+    gain_pga: 1X
+    update_interval: ${update_interval}
+
+  - platform: template
+    name: wellhouse power
+    id: wellhouse_power
+    lambda: return  (id(ct1Amps).state + id(ct2Amps).state) * id(ic1Volts).state;
+    accuracy_decimals: 0
+    unit_of_measurement: W
+    icon: "mdi:flash-circle"
+    update_interval: ${update_interval}
+
+  - platform: template
+    name: septic power
+    id: septic_power
+    lambda: return (id(ct3Amps).state + id(ct4Amps).state) * id(ic1Volts).state;
+    accuracy_decimals: 0
+    unit_of_measurement: W
+    icon: "mdi:flash-circle"
+    update_interval: ${update_interval}
+
+  - platform: template
+    name: garage power
+    id: garage_power
+    lambda: return (id(ct5Amps).state + id(ct6Amps).state) * id(ic2Volts).state;
+    accuracy_decimals: 0
+    unit_of_measurement: W
+    icon: "mdi:flash-circle"
+    update_interval: ${update_interval}
+
+  - platform: total_daily_energy
+    name: wellhouse daily energy
+    power_id: wellhouse_power
+    filters:
+      - multiply: 0.001
+    unit_of_measurement: kWh
+
+  - platform: total_daily_energy
+    name: septic daily energy
+    power_id: septic_power
+    filters:
+      - multiply: 0.001
+    unit_of_measurement: kWh
+
+  - platform: total_daily_energy
+    name: garage daily energy
+    power_id: garage_power
+    filters:
+      - multiply: 0.001
+    unit_of_measurement: kWh
+    
+spi:
+  clk_pin: 18
+  miso_pin: 19
+  mosi_pin: 23

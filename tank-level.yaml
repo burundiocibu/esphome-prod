@@ -1,0 +1,78 @@
+substitutions:
+  name: tank-level
+
+esphome:
+  name: ${name}
+  platform: ESP8266
+  board: d1_mini
+  comment: "wemos d1-mini"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+
+# Enable logging
+logger:
+  level: info
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "fwLMDHfpZVL6j3yhyUlHEaSGcA3T1Z6jg+M5ZDXg2xk="
+
+ota:
+  password: "98990a48086e1c416ed715916cea6066"
+
+web_server:
+
+prometheus:
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+    timezone: America/Chicago
+
+uart:
+  rx_pin: D7
+  baud_rate: 9600
+
+dallas:
+  - pin: D3
+
+switch:
+  - platform: restart
+    name: ${name} restart
+
+sensor:
+  - platform: uptime
+    name: ${name} uptime
+    update_interval: 120s
+
+  - platform: wifi_signal
+    name: ${name} wifi signal
+    update_interval: 120s
+
+# 3/1/2020 manually measured the level as being 184 mm down from full,
+# the hrxl read 475, 291 mm offsset
+  - platform: "hrxl_maxsonar_wr"
+    name: "Rainwater Tank Level"
+    # Tweak the filters for your application
+    filters:
+      - sliding_window_moving_average:
+          window_size: 12
+          send_every: 12
+      - or:
+        - throttle: "20min"
+        - delta: 0.02
+      - lambda: return x*1000;
+    accuracy_decimals: 1
+    unit_of_measurement: mm
+
+  - platform: dallas
+    address: 0xe203186bcbfaff28
+    name: ${name} water temperature
+    filters:
+    - lambda: return x * (9.0/5.0) + 32.0;
+    accuracy_decimals: 2
+    unit_of_measurement: °F

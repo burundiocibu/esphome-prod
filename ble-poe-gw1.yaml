@@ -1,0 +1,12 @@
+substitutions:
+  name: "ble-poe-gw1"
+  friendly_name: ble-poe-gw1
+packages:
+  esphome.bluetooth-proxy: github://esphome/bluetooth-proxies/olimex-esp32-poe-iso.yaml@main
+esphome:
+  name: ${name}
+  name_add_mac_suffix: false
+  friendly_name: ${friendly_name}
+api:
+  encryption:
+    key: +yOCyfllIyF4JkJ3AJuComa7Q7BSDBLVM9kV8FKb3TM=

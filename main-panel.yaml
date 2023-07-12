@@ -1,0 +1,443 @@
+# Hardware is a ESP32-WROOM-32U module on a
+# Circuit Setup 18 ch monitor' v1.4 rev 1
+# 2 add on boards on a main board; main board is on bottom.
+# https://circuitsetup.us/index.php/product/expandable-6-channel-esp32-energy-meter/
+# Bottom board is b1, Top board is b3
+# b1 cs1: 5, cs2: 4
+# b2 cs1: 27, cs2: 17
+# b3 cs1: 13, cs2: 22
+
+# placing CTs on the same line as the chips
+# CT1-3 on primary voltage   -  L2  - no tape
+# CT4-6 on secondary voltage -  L1  - red taped
+# board 2 has burden resistor jumpers cut
+# powers are positive going to loads stated
+#
+# Chan  type  BR  Use
+# ----  ----  --  ----------------
+# b1c4  80A   N   L1 to wellhouse
+# b1c1  80A   N   L2 to wellhouse
+# b1c5  80A   N   L1 to septic
+# b1c2  80A   N   L2 to septic
+# b1c6  80A   N   L1 to garage
+# b1c3  80A   N   L2 to garage
+#
+# b2c4  200A  Y   L1 to pec
+# b2c1  200A  Y   L2 to pec
+# b2c5  200A  Y   L1 from main buss
+# b2c2  200A  Y   L2 from main buss
+#
+# b3c4  120A  Y   L1 from yennefer
+# b3c1  120A  Y   L2 from yennefer
+# b3c5  80A   N   L1 from PV
+# b3c2  80A   N   L2 from PV
+# b3c6  120A  Y   L1 to house
+# b3c3  120A  Y   L2 to house
+
+
+substitutions:
+  name: "main-panel"
+  update_interval: 5s
+
+esphome:
+  name: ${name}
+  platform: ESP32
+  board: esp32-pro
+  comment: "ESP32-WROOM-32U"
+
+wifi:
+  ssid: !secret ssid2
+  password: !secret password2
+
+logger:
+  level: info
+
+api:
+
+ota:
+
+prometheus:
+
+web_server:
+  port: 80
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+    timezone: America/Chicago
+
+#debug:
+#  update_interval: 5s
+
+text_sensor:
+  - platform: version
+    name: "ESPHome Version"
+
+switch:
+  - platform: restart
+    name: ${name} restart
+
+
+sensor:
+  - platform: uptime
+    name: ${name} uptime
+    update_interval: 120s
+
+  - platform: wifi_signal
+    name: ${name} wifi signal
+    update_interval: 120s
+
+  #==============================================
+  # board #1, IC 1
+  - platform: atm90e32
+    cs_pin: 5
+    chip_temperature:
+      name: ${name} temperature
+      unit_of_measurement: °C
+    phase_a:
+      gain_voltage: 7639
+      voltage:
+        name: L2 voltage
+        accuracy_decimals: 1
+        unit_of_measurement: "VAC"
+      gain_ct: 42600
+      power:
+        name: Wellhouse L2 power
+        id: wellhouse_l2_power
+        unit_of_measurement: "W"
+      forward_active_energy:
+        name: Wellhouse L2 fae
+        unit_of_measurement: "Wh"
+      power_factor:
+        name: Wellhouse L2 pf
+
+    phase_b:
+      gain_ct: 40000
+      power:
+        name: Septic L2 power
+        id: septic_l2_power
+        unit_of_measurement: "W"
+      forward_active_energy:
+        name: Septic L2 fae
+        unit_of_measurement: "Wh"
+      power_factor:
+        name: Septic L2 pf
+
+    phase_c:
+      gain_ct: 46000
+      power:
+        name: Garage L2 power
+        id: garage_l2_power
+        unit_of_measurement: "W"
+      forward_active_energy:
+        name: Garage L2 fae
+        unit_of_measurement: "Wh"
+      power_factor:
+        name: Garage L2 pf
+
+    frequency:
+      name: L2 frequency
+      unit_of_measurement: "Hz"
+      accuracy_decimals: 2
+    line_frequency: 60Hz
+    gain_pga: 1X
+    update_interval: ${update_interval}
+
+
+  # board #1, IC 2
+  - platform: atm90e32
+    cs_pin: 4
+    phase_a:
+      gain_voltage: 7993
+      voltage:
+        name: L1 voltage
+        accuracy_decimals: 1
+        unit_of_measurement: "VAC"
+      gain_ct: 40000
+      power:
+        name: Wellhouse L1 power
+        id: wellhouse_l1_power
+        unit_of_measurement: "W"
+      forward_active_energy:
+        name: Wellhouse L1 fae
+        unit_of_measurement: "Wh"
+      power_factor:
+        name: Wellhouse L1 pf
+
+    phase_b:
+      gain_ct: 45200
+      power:
+        name: Septic L1 power
+        id: septic_l1_power
+        unit_of_measurement: "W"
+      forward_active_energy:
+        name: Septic L1 fae
+        unit_of_measurement: "Wh"
+      power_factor:
+        name: Septic L1 pf
+
+    phase_c:
+      gain_ct: 40000
+      power:
+        name: Garage L1 power
+        id: garage_l1_power
+        unit_of_measurement: "W"
+      forward_active_energy:
+        name: Garage L1 fae
+        unit_of_measurement: "Wh"
+      power_factor:
+        name: Garage L1 pf
+
+    frequency:
+      name: L1 frequency
+      id: b1f2
+      unit_of_measurement: "Hz"
+      accuracy_decimals: 2
+    line_frequency: 60Hz
+    gain_pga: 1X
+    update_interval: ${update_interval}
+
+
+  #==============================================
+  # board #2, IC 1
+  - platform: atm90e32
+    cs_pin: 27
+    phase_a:
+      gain_voltage: 7335
+      gain_ct: 48000
+      power:
+        name: PEC L2 power
+        id: pec_l2_power
+        unit_of_measurement: "W"
+      forward_active_energy:
+        name: PEC L2 fae
+        unit_of_measurement: "Wh"
+      reverse_active_energy:
+        name: PEC L2 rae
+        unit_of_measurement: "Wh"
+      power_factor:
+        name: PEC L2 pf
+
+    phase_b:
+      gain_ct: 47520
+      power:
+        name: Mains L2 power
+        id: mains_l2_power
+        unit_of_measurement: "W"
+      forward_active_energy:
+        name: Mains L2 fae
+        unit_of_measurement: "Wh"
+      reverse_active_energy:
+        name: Mains L2 rae
+        unit_of_measurement: "Wh"
+      power_factor:
+        name: Mains L2 pf
+
+    line_frequency: 60Hz
+    gain_pga: 4X
+    update_interval: ${update_interval}
+
+  # board #2, IC 2 ------------------------------
+  - platform: atm90e32
+    cs_pin: 17
+    phase_a:
+      gain_voltage: 7335
+      gain_ct: 48000
+      power:
+        name: PEC L1 power
+        id: pec_l1_power
+        unit_of_measurement: "W"
+      forward_active_energy:
+        name: PEC L1 fae
+        unit_of_measurement: "Wh"
+      reverse_active_energy:
+        name: PEC L1 rae
+        unit_of_measurement: "Wh"
+      power_factor:
+        name: PEC L1 pf
+    phase_b:
+      gain_ct: 50160
+      power:
+        name: Mains L1 power
+        id: mains_l1_power
+        unit_of_measurement: "W"
+      forward_active_energy:
+        name: Mains L1 fae
+        unit_of_measurement: "Wh"
+      reverse_active_energy:
+        name: Mains L1 rae
+        unit_of_measurement: "Wh"
+      power_factor:
+        name: Mains L1 pf
+
+    line_frequency: 60Hz
+    gain_pga: 4X
+    update_interval: ${update_interval}
+
+
+  #==============================================
+  # board #3, IC 1
+  - platform: atm90e32
+    cs_pin: 13
+    phase_a:
+      gain_voltage: 7335
+      gain_ct: 40000
+      power:
+        name: Yennefer L2 power
+        id: yennefer_l2_power
+        unit_of_measurement: "W"
+      forward_active_energy:
+        name: Yennefer L2 fae
+        unit_of_measurement: "Wh"
+      reverse_active_energy:
+        name: Yennefer L2 rae
+        unit_of_measurement: "Wh"
+      power_factor:
+        name: Yennefer L2 pf
+
+    phase_b:
+      gain_ct: 22049
+      power:
+        name: PV L2 power
+        id: pv_l2_power
+        filters:
+          - lambda: return 2 * x;
+        unit_of_measurement: "W"
+      forward_active_energy:
+        name: PV L2 fae
+        filters:
+          - lambda: return 2 * x;
+        unit_of_measurement: "Wh"
+      reverse_active_energy:
+        name: PV L2 rae
+        filters:
+          - lambda: return 2 * x;
+        unit_of_measurement: "Wh"
+      power_factor:
+        name: PV L2 pf
+
+    phase_c:
+      gain_ct: 47117
+      power:
+        name: House L2 power
+        id: house_l2_power
+        unit_of_measurement: "W"
+      forward_active_energy:
+        name: House L2 fae
+        unit_of_measurement: "Wh"
+      power_factor:
+        name: House L2 pf
+
+    line_frequency: 60Hz
+    gain_pga: 1X
+    update_interval: ${update_interval}
+
+  # board #3, IC 2
+  - platform: atm90e32
+    cs_pin: 22
+    phase_a:
+      gain_voltage: 7335
+      gain_ct: 40000
+      power:
+        name: Yennefer L1 power
+        id: yennefer_l1_power
+        unit_of_measurement: "W"
+      forward_active_energy:
+        name: Yennefer L1 fae
+        unit_of_measurement: "Wh"
+      reverse_active_energy:
+        name: Yennefer L1 rae
+        unit_of_measurement: "Wh"
+      power_factor:
+        name: Yennefer L1 pf
+
+    phase_b:
+      gain_ct: 21318
+      power:
+        name: PV L1 power
+        id: pv_l1_power
+        unit_of_measurement: "W"
+        filters:
+          - lambda: return 2 * x;
+      forward_active_energy:
+        name: PV L1 fae
+        filters:
+          - lambda: return 2 * x;
+        unit_of_measurement: "Wh"
+      reverse_active_energy:
+        name: PV L1 rae
+        filters:
+          - lambda: return 2 * x;
+        unit_of_measurement: "Wh"
+      power_factor:
+        name: PV L1 pf
+
+    phase_c:
+      gain_ct: 45797
+      power:
+        name: House L1 power
+        id: house_l1_power
+        unit_of_measurement: "W"
+      forward_active_energy:
+        name: House L1 fae
+        unit_of_measurement: "Wh"
+      power_factor:
+        name: House L1 pf
+
+    line_frequency: 60Hz
+    gain_pga: 1X
+    update_interval: ${update_interval}
+
+
+  - platform: template
+    name: Wellhouse power
+    lambda: return id(wellhouse_l1_power).state + id(wellhouse_l2_power).state;
+    update_interval: ${update_interval}
+    unit_of_measurement: W
+
+  - platform: template
+    name: Garage power
+    lambda: return id(garage_l1_power).state + id(garage_l2_power).state;
+    update_interval: ${update_interval}
+    unit_of_measurement: W
+
+  - platform: template
+    name: Septic power
+    lambda: return id(septic_l1_power).state + id(septic_l2_power).state;
+    update_interval: ${update_interval}
+    unit_of_measurement: W
+
+  - platform: template
+    name: House power
+    lambda: return id(house_l1_power).state + id(house_l2_power).state;
+    update_interval: ${update_interval}
+    unit_of_measurement: W
+
+  - platform: template
+    name: PV power
+    lambda: return id(pv_l1_power).state + id(pv_l2_power).state;
+    update_interval: ${update_interval}
+    unit_of_measurement: W
+
+  - platform: template
+    name: Mains power
+    lambda: return id(mains_l1_power).state + id(mains_l2_power).state;
+    update_interval: ${update_interval}
+    unit_of_measurement: W
+
+  - platform: template
+    name: PEC power
+    lambda: return id(pec_l1_power).state + id(pec_l2_power).state;
+    update_interval: ${update_interval}
+    unit_of_measurement: W
+
+  - platform: template
+    name: Yennefer power
+    lambda: return id(yennefer_l1_power).state + id(yennefer_l2_power).state;
+    update_interval: ${update_interval}
+    unit_of_measurement: W
+
+spi:
+  clk_pin: 18
+  miso_pin: 19
+  mosi_pin: 23

@@ -1,0 +1,82 @@
+substitutions:
+  name: gate-manager
+
+esphome:
+  name: ${name}
+  platform: ESP8266
+  board: d1_mini
+
+wifi:
+  ssid: !secret ssid2
+  password: !secret password2
+  use_address: 192.168.2.204
+captive_portal:
+
+logger:
+
+api:
+  reboot_timeout: 5 min
+
+ota:
+
+prometheus:
+
+web_server:
+  port: 80
+  
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: America/Chicago
+
+
+text_sensor:
+  - platform: version
+    name: "ESPHome Version"
+
+
+switch:
+  - platform: restart
+    name: ${name} restart
+
+  - platform: gpio
+    id: sw_safe
+    internal: True
+    pin: D1
+
+  - platform: gpio
+    id: sw_exit
+    internal: True
+    pin: D2
+
+
+sensor:
+  - platform: uptime
+    name: ${name} uptime
+    update_interval: 120s
+    
+  - platform: wifi_signal
+    name: ${name} wifi signal
+    update_interval: 120s
+
+
+cover:
+  - platform: template
+    name: "Driveway Gate"
+    device_class: gate
+    lambda: |-
+      if (id(sw_safe).state) {
+        return COVER_OPEN;
+      } else {
+        return COVER_CLOSED;
+      }
+    open_action:
+      # Cancel any previous action
+      - switch.turn_off: sw_safe
+      - switch.turn_on: sw_exit
+      - delay: 0.5s
+      - switch.turn_off: sw_exit
+      - switch.turn_on: sw_safe
+    close_action:
+      - switch.turn_off: sw_safe
+      - switch.turn_off: sw_exit

@@ -1,0 +1,76 @@
+substitutions:
+  name: ble-gw2
+  update_interval: 15s
+
+esphome:
+  name: ${name}
+  platform: ESP32
+  board: esp32dev
+  comment: "ESP32 Devkitv1"
+
+wifi:
+  ssid: !secret ssid2
+  password: !secret password2
+
+logger:
+  level: debug
+  logs:
+    sensor: debug
+
+api:
+
+ota:
+
+prometheus:
+
+web_server:
+  port: 80
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+    timezone: America/Chicago
+
+text_sensor:
+  - platform: version
+    name: "ESPHome Version"
+
+switch:
+  - platform: restart
+    name: ${name} restart
+
+esp32_ble_tracker:
+  scan_parameters:
+    interval: 1100ms
+    window: 1100ms
+    active: true
+
+bluetooth_proxy:
+  active: true
+
+ble_client:
+  - mac_address: F4:5E:AB:84:C7:40
+    id: anova_sv
+
+climate:
+  - platform: anova
+    name: "Anova cooker"
+    ble_client_id: anova_sv
+    unit_of_measurement: f
+
+sensor:
+  - platform: uptime
+    name: ${name} uptime
+    update_interval: 30s
+
+  - platform: wifi_signal
+    name: ${name} wifi signal
+    update_interval: 30s
+
+  - platform: ble_rssi
+    mac_address: 49:42:08:00:58:72
+    name: "Freezer IBS-TH2 rssi"
+
+  - platform: ble_rssi
+    mac_address: 49:42:07:00:29:3B
+    name: "Refrigerator IBS-TH2 rssi"

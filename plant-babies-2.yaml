@@ -1,0 +1,62 @@
+# This is for a MagicHome dimmer module
+substitutions:
+  name: "plant-babies-2"
+
+esphome:
+  name: ${name}
+  platform: ESP8266
+  board: esp01_1m
+  comment: "MagicHome"
+
+wifi:
+  ssid: !secret ssid2
+  password: !secret password2
+
+prometheus:
+
+web_server:
+  port: 80
+
+logger:
+
+api:
+
+ota:
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+    timezone: America/Chicago
+
+
+text_sensor:
+  - platform: version
+    name: "ESPHome Version"
+
+
+switch:
+  - platform: restart
+    name: "${name} restart"
+
+
+sensor:
+  - platform: uptime
+    name: ${name} uptime
+    update_interval: 120s
+    
+  - platform: wifi_signal
+    name: ${name} wifi signal
+    update_interval: 120s
+    
+
+output:
+  - platform: esp8266_pwm
+    pin: GPIO12
+    frequency: 1000 Hz
+    id: pwm
+
+    
+light:
+  - platform: monochromatic
+    name: "Plant Babies 2"
+    output: pwm

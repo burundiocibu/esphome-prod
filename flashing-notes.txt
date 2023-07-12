@@ -1,0 +1,210 @@
+Notes on initial flashing of devices
+
+https://www.esphome-devices.com
+https://templates.blakadder.com/index.html
+
+---------
+Shelly EM
+
+Need to use 24/26 ga wire/pins to connect to header.
+
+with octogon facing away, left to right:
+
+1 gnd        -> gnd
+2 GPIO0      -> gnd
+3 rst
+4 vcc (3.3)  -> vcc
+5 RxD        -> USB to TTL TxD
+6 TxD        -> USB to TTL RxD
+
+power off device
+short GPIO0 to ground
+power on device
+let GPIO0 float
+
+cd ~/duckling/containers/esphome
+pipenv shell
+esptool.py --port=$(usb_serial) --baud 115200 erase_flash
+name=house-panel
+esptool.py --port=$(usb_serial) --baud 115200  write_flash -fm qio 0x0000 $name/.pioenvs/$name/firmware.bin
+
+This never worked for the EM so I tried going through Tasmota as per https://savjee.be/2020/09/shelly-2.5-flash-esphome-over-the-air/
+Had to go through tasmota-minimal but it finally worked:
+
+conda activate pio
+cd ~/git/Tasmota
+pio run --target upload --enviroment tasmota-minimal
+
+Supposedly I need to set Option78 to allow non-tasmota uploads
+
+Note that I still had to cycle power on the device after flashing to get the ADE to talk
+correctly via I2C
+
+
+--------------------------
+Circuit Setup Energy meter
+
+When flashing unplug usb, press and hold boot, plug device in, release
+boot, start flash
+
+Flashed fine with esphomeflasher and an esphome image
+
+
+------------
+Sonoff S31
+
+IIRC, this flashed via serial directly from ESPHome
+
+
+--------
+tinyPico
+
+This flashed via the USB/Serial built into the device
+
+esptool.py --port=$(usb_serial) --baud 115200  write_flash -z 0x1000 $name/.pioenvs/$name/firmware.bin
+
+Had to install via Tasmota as I did the Shelly EM for it to work.
+
+
+--------
+wemos d1
+
+commented out conda
+started shell
+cd ~/git/esphome
+pipenv run bash
+pipenv install esptool
+esptool.py --before default_reset --after hard_reset --baud 115200 --chip esp8266 write_flash 0x0 ~/Downloads/bench-logger.bin
+pyserial-miniterm
+... 
+Worked like a champ from the mac looks like it was really the esptool invocation
+
+
+conda create -n esp pip
+conda activate esp
+pip install esptool
+esptool.py --before default_reset --after hard_reset write_flash 0x0 ~/Downloads/bench-logger.bin
+...
+Note that it auto-detected the serial port.
+
+-------
+esp32 (hilietgo TTGO module)
+
+can't get it to load. I think it may be missing a bootloader
+
+Maybe try: https://github.com/esphome/esphome-flasher
+
+finally got that to work with conda
+conda activate esphome
+esphomeflasher ~/Downloads/bench-logger.bin
+And it flashed it just fine.
+
+pythonw `which esphomeflasher`
+
+------------
+Sonoff TX T0
+
+Disconnect mainboard from relay module, wire in vcc rx tx gnd
+connect esp8266 side of R19 to gpio0
+
+esphomeflasher ~/Downloads/foo.bin
+
+
+------------
+Gosund Smart Light Switch SW1, model KS-602S
+
+Use T6 to open
+Has labeled pads on top of board for rx/tx/vcc/gnd/io0
+
+
+------------
+Gosund SW2 Dimmer
+Use T6 to open
+Has labeled pads on top of board for rx/tx/vcc/gnd/io0
+
+Never got the tyua MCU to talk
+
+------------
+Treatlife 2 way dimmer, DS02
+
+Had to make connections directly to ESP8266 to flash it
+Make sure to short the "reset" switch to keep the tuya in reset
+during flashing. 
+
+Flashed fine, couldn't get tyua mcu to work with tasmota. well, kinda did.
+It would toggle it on/off but the dimmer didn't work
+https://templates.blakadder.com/treatlife_DS02S.html
+Template: {"NAME":"DS02S Dimmer","GPIO":[0,107,0,108,0,0,0,0,0,0,0,0,0],"FLAG":0,"BASE":54}
+Backlog setoption97 1; TuyaSend2 3,10; DimmerRange 10,1000
+
+Worked well in tasmota and presented a dimmer to HA but not to the in-device
+web UI
+
+
+----------
+Martin Jerry Dimmer SD01
+
+Pin Signal
+CN1-1   TXD
+CN1-2   RXD
+CN1-3   GPIO2
+CN1-4   GPIO0
+CN1-5   GROUND
+CN1-6   VCC (square pad)
+
+Works pretty well with esphome and with homa assistant
+still no interface for dimmer in the esphome web ui
+
+Tasmota works well with template:
+{"NAME":"MJ-SD01 Dimmer","GPIO":[34,33,0,323,576,322,0,0,321,416,320,96,256],"FLAG":0,"BASE":73}
+and presents a dimmer slider.
+
+I think this one is a keeper
+
+
+-------------
+Martin Jerry Switch MJ-S01
+
+Pin     Signal
+CN1-1   TXD
+CN1-2   RXD
+CN1-3   GPIO2
+CN1-4   GPIO0
+CN1-5   GROUND
+CN1-6   VCC (square pad)
+
+Flashes fine.
+
+Under current esphome, it keeps reseting itself on the wifi timeout.
+
+-----------
+Treatlife DS03 fan/light dimmer switch (front only snaps on)
+Also Esmlfe DDS03 (Opens with 4 phillips on front of switch)
+
+See https://www.digiblur.com/2020/07/the-tasmota-fan-controller-ive-been.html for flashing notes
+
+
+--------------
+tinypio:
+
+Flashing esphome directly onto the tinypico never worked.
+Had to load tasmota onto it first:
+
+conda activate pio
+cd ~/git/Tasmota
+pio run --target upload --environment tasmota32
+... load the web GUI on the device and upload esphome binary
+
+
+-----------------
+magichome: running tasmota 
+Failed to upload when running regular tasmota image
+http://ota.tasmota.com/tasmota/release/tasmota-minimal.bin
+and then flashed the esphome image from the web UT and it worked.
+
+---------------
+ElectroDragon RGB module
+
+Had to swap Rx/Tx between serial adaptor and board but it programs just fine
+
+

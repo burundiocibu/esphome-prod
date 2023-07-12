@@ -1,0 +1,66 @@
+# hardware wemos d1-mini with a lolin oled 0.66 shield
+# https://www.wemos.cc/en/latest/d1_mini_shield/oled_0_66.html
+# oled shield: driver ssd1306 (i2c on 0x3c or 0x3d)
+# D1 GPIO5 SCL
+# D2 GPIO4 SDA
+# shield i2c button (0x31)
+# https://esphome.io/components/display/ssd1306.html for the oled shield
+
+substitutions:
+  name: bench-logger
+
+esphome:
+  name: ${name}
+  platform: ESP8266
+  board: d1_mini
+
+wifi:
+  ssid: !secret ssid2
+  password: !secret password2
+
+  ap:
+    ssid: "Bench-Logger Fallback Hotspot"
+    password: "epCvYh1iRzfA"
+
+captive_portal:
+
+logger:
+
+api:
+
+ota:
+
+prometheus:
+
+web_server:
+  port: 80
+
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: America/Chicago
+
+switch:
+  - platform: restart
+    name: ${name} restart
+
+sensor:  
+  - platform: uptime
+    name: ${name} uptime
+    update_interval: 120s
+    
+  - platform: wifi_signal
+    name: ${name} wifi signal
+    update_interval: 120s
+
+i2c:
+  sda: D2
+  scl: D1
+
+display:
+  - platform: ssd1306_i2c
+    model: "SSD1306 64x48"
+    address: 0x3c
+    lambda: |-
+      it.line(0, 0, 63, 47);
+      it.filled_circle(32, 23, 10);

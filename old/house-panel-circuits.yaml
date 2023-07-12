@@ -1,0 +1,511 @@
+# Hardware is a ESP32-WROOM-32U module on a
+# Circuit Setup 24 ch monitor' v1.4 rev 1
+# 3 add on boards on a main board; main board is on bottom.
+# https://circuitsetup.us/index.php/product/expandable-6-channel-esp32-energy-meter/
+# Bottom board is b1, Top board is b4
+# b1 cs1: 5, cs2: 4
+# b2 cs1: 0, cs2: 16
+# b3 cs1: 27, cs2: 17
+# b4 cs1: 13, cs2: 22
+# b1c1 is first current tap
+# b4c6 is last current tap
+# b1v1 is voltage
+# b1f1 is frequency
+# Not all voltages and frequencies are brought out
+substitutions:
+  name: house-panel-circuits
+  update_interval: 15s
+  current_cal: '41996' # nominal value
+  voltage_cal: '7305' # nominal value
+
+esphome:
+  name: ${name}
+  platform: ESP32
+  board: esp32-pro
+  comment: "ESP32-WROOM-32U"
+
+wifi:
+  ssid: !secret ssid2
+  password: !secret password2
+
+logger:
+  level: info
+
+api:
+
+ota:
+
+prometheus:
+
+web_server:
+  port: 80
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+    timezone: America/Chicago
+
+
+text_sensor:
+  - platform: version
+    name: "ESPHome Version"
+
+
+switch:
+  - platform: restart
+    name: ${name} restart
+
+
+sensor:
+  - platform: uptime
+    name: ${name} uptime
+    update_interval: 120s
+    
+  - platform: wifi_signal
+    name: ${name} wifi signal
+    update_interval: 120s
+
+  # board #1, IC 1 ------------------------------
+  - platform: atm90e32
+    cs_pin: 5
+    phase_a:
+      gain_voltage: 7584
+      gain_ct: 41705
+      voltage:
+        name: mains voltage
+        id: b1v1
+        accuracy_decimals: 1
+        unit_of_measurement: "VAC"
+      current:
+#        name: ${name} b1c1
+        id: b1c1
+        unit_of_measurement: "A"
+    phase_b:
+      gain_ct: 41821
+      current:
+#        name: ${name} b1c2
+        id: b1c2
+        unit_of_measurement: "A"
+    phase_c:
+      gain_ct: 41705
+      current:
+#        name: ${name} b1c3
+        id: b1c3
+        unit_of_measurement: "A"
+    frequency:
+      name: mains frequency
+      id: b1f1
+      unit_of_measurement: "Hz"
+    line_frequency: 60Hz
+    gain_pga: 1X
+    update_interval: ${update_interval}
+    
+  # board #1, IC 2 ------------------------------
+  - platform: atm90e32
+    cs_pin: 4
+    phase_a:
+      gain_voltage: 7584
+      gain_ct: 41503
+      voltage:
+#        name: ${name} b1v2
+        id: b1v2
+        accuracy_decimals: 1
+        unit_of_measurement: "VAC"
+      current:
+#        name: ${name} b1c4
+        id: b1c4
+        unit_of_measurement: "A"
+    phase_b:
+      gain_ct: 41762
+      current:
+#        name: ${name} b1c5
+        id: b1c5
+        unit_of_measurement: "A"
+    phase_c:
+      gain_ct: 41503
+      current:
+#        name: ${name} b1c6
+        id: b1c6
+        unit_of_measurement: "A"
+    frequency:
+      id: b1f2
+      unit_of_measurement: "Hz"
+    line_frequency: 60Hz
+    gain_pga: 1X
+    update_interval: ${update_interval}
+
+  # board #2, IC 1 ------------------------------
+  - platform: atm90e32
+    cs_pin: 0
+    phase_a:
+      gain_voltage: 7335
+      gain_ct: 41648
+      voltage:
+#        name: ${name} b2v1
+        id: b2v1
+        accuracy_decimals: 1
+        unit_of_measurement: "VAC"
+      current:
+#        name: ${name} b2c1
+        id: b2c1
+        unit_of_measurement: "A"
+    phase_b:
+      gain_ct: 44565
+      current:
+#        name: ${name} b2c2
+        id: b2c2
+        unit_of_measurement: "A"
+    phase_c:
+      gain_ct: 41648
+      current:
+#        name: ${name} b2c3
+        id: b2c3
+        unit_of_measurement: "A"
+    frequency:
+      id: b2f1
+      unit_of_measurement: "Hz"
+    line_frequency: 60Hz
+    gain_pga: 1X
+    update_interval: ${update_interval}
+    
+  # board #2, IC 2 ------------------------------
+  - platform: atm90e32
+    cs_pin: 16
+    phase_a:
+      gain_voltage: 7335
+      gain_ct: 41648
+      voltage:
+#        name: ${name} b2v2
+        id: b2v2
+        accuracy_decimals: 1
+        unit_of_measurement: "VAC"
+      current:
+#        name: ${name} b2c4
+        id: b2c4
+        unit_of_measurement: "A"
+    phase_b:
+      gain_ct: 42859
+      current:
+#        name: ${name} b2c5
+        id: b2c5
+        unit_of_measurement: "A"
+    phase_c:
+      gain_ct: 41648
+      current:
+#        name: ${name} b2c6
+        id: b2c6
+        unit_of_measurement: "A"
+    frequency:
+      id: b2f2
+      unit_of_measurement: "Hz"
+    line_frequency: 60Hz
+    gain_pga: 1X
+    update_interval: ${update_interval}
+
+  # board #3, IC 1 ------------------------------
+  - platform: atm90e32
+    cs_pin: 27
+    phase_a:
+      gain_voltage: 7335
+      gain_ct: 41587
+      voltage:
+#        name: ${name} b3v1
+        id: b3v1
+        accuracy_decimals: 1
+        unit_of_measurement: "VAC"
+      current:
+#        name: ${name} b3c1
+        id: b3c1
+        unit_of_measurement: "A"
+    phase_b:
+      gain_ct: 41674
+      current:
+#        name: ${name} b3c2
+        id: b3c2
+        unit_of_measurement: "A"
+    phase_c:
+      gain_ct: 41386
+      current:
+#        name: ${name} b3c3
+        id: b3c3
+        unit_of_measurement: "A"
+    frequency:
+      id: b3f1
+      unit_of_measurement: "Hz"
+    line_frequency: 60Hz
+    gain_pga: 1X
+    update_interval: ${update_interval}
+
+  # board #3, IC 2 ------------------------------
+  - platform: atm90e32
+    cs_pin: 17
+    phase_a:
+      gain_voltage: 7335
+      gain_ct: ${current_cal}
+      voltage:
+#        name: ${name} b3v2
+        id: b3v2
+        accuracy_decimals: 1
+        unit_of_measurement: "VAC"
+      current:
+#        name: ${name} b3c4
+        id: b3c4
+        unit_of_measurement: "A"
+    phase_b:
+      gain_ct: 41937
+      current:
+#        name: ${name} b3c5
+        id: b3c5
+        unit_of_measurement: "A"
+    phase_c:
+      gain_ct: 42055
+      current:
+#        name: ${name} b3c6
+        id: b3c6
+        unit_of_measurement: "A"
+    frequency:
+      id: b3f2
+      unit_of_measurement: "Hz"
+    line_frequency: 60Hz
+    gain_pga: 1X
+    update_interval: ${update_interval}
+
+  # board #4, IC 1 ------------------------------
+  - platform: atm90e32
+    cs_pin: 13
+    phase_a:
+      gain_voltage: ${voltage_cal}
+      gain_ct: 40089
+      voltage:
+#        name: ${name} b4v1
+        id: b4v1
+        accuracy_decimals: 1
+        unit_of_measurement: "VAC"
+      current:
+#        name: ${name} b4c1
+        id: b4c1
+        unit_of_measurement: "A"
+    phase_b:
+      gain_ct: 39908
+      current:
+#        name: ${name} b4c2
+        id: b4c2
+        unit_of_measurement: "A"
+    phase_c:
+      gain_ct: ${current_cal}
+      current:
+#        name: ${name} b4c3
+        id: b4c3
+        unit_of_measurement: "A"
+    frequency:
+      id: b4f1
+      unit_of_measurement: "Hz"
+    line_frequency: 60Hz
+    gain_pga: 1X
+    update_interval: ${update_interval}
+    
+  # board #4, IC 2 ------------------------------
+  - platform: atm90e32
+    cs_pin: 22
+    phase_a:
+      gain_voltage: ${voltage_cal}
+      gain_ct: ${current_cal}
+      voltage:
+#        name: ${name} b4v2
+        id: b4v2
+        accuracy_decimals: 1
+        unit_of_measurement: "VAC"
+      current:
+#        name: ${name} b4c4
+        id: b4c4
+        unit_of_measurement: "A"
+    phase_b:
+      gain_ct: ${current_cal}
+      current:
+#        name: ${name} b4c5
+        id: b4c5
+        unit_of_measurement: "A"
+    phase_c:
+      gain_ct: ${current_cal}
+      current:
+#        name: ${name} b4c6
+        id: b4c6
+        unit_of_measurement: "A"
+    frequency:
+      id: b4f2
+      unit_of_measurement: "Hz"
+    line_frequency: 60Hz
+    gain_pga: 1X
+    update_interval: ${update_interval}
+
+# - These are the only things we really want to export
+
+  - platform: template
+    name: upstairs A/C (1,3) power
+    id: upstairs_ac_pwr
+    lambda: return  (id(b1c1).state + id(b1c2).state + id(b2c1).state + id(b2c2).state) * id(b1v1).state;
+    accuracy_decimals: 0
+    unit_of_measurement: W
+    update_interval: ${update_interval}
+
+  - platform: total_daily_energy
+    name: upstairs A/C (1,3) daily energy
+    power_id: upstairs_ac_pwr
+    filters:
+      - multiply: 0.001
+    unit_of_measurement: kWh
+
+  - platform: template
+    name: kitchen lights (5B) power
+    id: kitchen_lights_pwr
+    lambda: return  id(b2c3).state * id(b2v1).state;
+    accuracy_decimals: 0
+    unit_of_measurement: W
+    update_interval: ${update_interval}
+
+  - platform: total_daily_energy
+    name: kitchen lights (5B) daily energy
+    power_id: kitchen_lights_pwr
+    filters:
+      - multiply: 0.001
+    unit_of_measurement: kWh
+ 
+  - platform: template
+    name: W kitchen outlets & fridge (7A) power
+    id: kitchen_outlets_pwr
+    lambda: return  id(b2c6).state * id(b2v1).state;
+    accuracy_decimals: 0
+    unit_of_measurement: W
+    update_interval: ${update_interval}
+
+  - platform: total_daily_energy
+    name: W kitchen outlets and fridge (7A) daily energy
+    power_id: kitchen_outlets_pwr
+    filters:
+      - multiply: 0.001
+    unit_of_measurement: kWh
+
+  - platform: template
+    name: washing machine (7B) power
+    id: washing_machine_pwr
+    lambda: return  id(b2c4).state * id(b2v1).state;
+    accuracy_decimals: 0
+    unit_of_measurement: W
+    update_interval: ${update_interval}
+
+  - platform: total_daily_energy
+    name: washing machine (7B) daily energy
+    power_id: washing_machine_pwr
+    filters:
+      - multiply: 0.001
+    unit_of_measurement: kWh
+
+  - platform: template
+    name: dishwasher and outlets (9A) power
+    id: dishwasher_pwr
+    lambda: return  id(b2c5).state * id(b2v1).state;
+    accuracy_decimals: 0
+    unit_of_measurement: W
+    update_interval: ${update_interval}
+
+  - platform: total_daily_energy
+    name: dishwasher and outlets (9A) daily energy
+    power_id: dishwasher_pwr
+    filters:
+      - multiply: 0.001
+    unit_of_measurement: kWh
+
+  - platform: template
+    name: hot water heater (9B) power
+    id: hot_water_heater_pwr
+    lambda: return  (id(b3c1).state + id(b3c2).state) * id(b3v1).state;
+    accuracy_decimals: 0
+    unit_of_measurement: W
+    update_interval: ${update_interval}
+
+  - platform: total_daily_energy
+    name: hot water heater (9B) daily energy
+    power_id: hot_water_heater_pwr
+    filters:
+      - multiply: 0.001
+    unit_of_measurement: kWh
+
+  - platform: template
+    name: dryer (11B,13A) power
+    id: dryer_pwr
+    lambda: return  (id(b3c3).state + id(b3c4).state) * id(b3v1).state;
+    accuracy_decimals: 0
+    unit_of_measurement: W
+    update_interval: ${update_interval}
+
+  - platform: total_daily_energy
+    name: dryer (11B,13A) daily energy
+    power_id: dryer_pwr
+    filters:
+      - multiply: 0.001
+    unit_of_measurement: kWh
+
+  - platform: template
+    name: great room (2A) power
+    id: great_room_pwr
+    lambda: return  id(b4c3).state * id(b3v1).state;
+    accuracy_decimals: 0
+    unit_of_measurement: W
+    update_interval: ${update_interval}
+
+  - platform: total_daily_energy
+    name: great_room (2A) daily energy
+    power_id: great_room_pwr
+    filters:
+      - multiply: 0.001
+    unit_of_measurement: kWh
+
+  - platform: template
+    name: downstairs A/C (17,18,19,20) power
+    id: downstairs_ac_pwr
+    lambda: return  (id(b1c3).state + id(b1c4).state + id(b1c5).state + id(b1c6).state) * id(b1v1).state;
+    accuracy_decimals: 0
+    unit_of_measurement: W
+    update_interval: ${update_interval}
+
+  - platform: total_daily_energy
+    name: downstairs A/C (17,18,19,20) daily energy
+    power_id: downstairs_ac_pwr
+    filters:
+      - multiply: 0.001
+    unit_of_measurement: kWh
+
+  - platform: template
+    name: range (10B,12A) power
+    id: range_pwr
+    lambda: return  (id(b3c5).state + id(b3c6).state) * id(b3v1).state;
+    accuracy_decimals: 0
+    unit_of_measurement: W
+    update_interval: ${update_interval}
+
+  - platform: total_daily_energy
+    name: range (10B,12A) daily energy
+    power_id: range_pwr
+    filters:
+      - multiply: 0.001
+    unit_of_measurement: kWh
+
+  - platform: template
+    name: mains power
+    id: mains_pwr
+    lambda: return  (id(b4c1).state + id(b4c2).state) * id(b4v1).state;
+    accuracy_decimals: 0
+    unit_of_measurement: W
+    update_interval: ${update_interval}
+
+  - platform: total_daily_energy
+    name: mains daily energy
+    power_id: mains_pwr
+    filters:
+      - multiply: 0.001
+    unit_of_measurement: kWh
+
+spi:
+  clk_pin: 18
+  miso_pin: 19
+  mosi_pin: 23

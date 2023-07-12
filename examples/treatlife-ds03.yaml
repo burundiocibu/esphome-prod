@@ -1,0 +1,71 @@
+# This is for a treatlife DS02 three way wall dimmer switch
+# 
+substitutions:
+  name: "porch-fans-lights"
+
+esphome:
+  name: ${name}
+  platform: ESP8266
+  board: esp01_1m
+
+wifi:
+  ssid: !secret ssid2
+  password: !secret password2
+#  use_address: 192.168.2.119
+
+logger:
+  level: debug
+  baud_rate: 0 # dimmer uses serial
+
+prometheus:
+
+web_server:
+  port: 80
+
+api:
+
+ota:
+
+uart:
+  id: uart_bus
+  baud_rate: 115200
+  tx_pin: GPIO1
+  rx_pin: GPIO3
+  
+
+tuya:
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+    timezone: America/Chicago
+
+switch:
+  - platform: restart
+    name: "${name} restart"
+
+sensor:
+  - platform: uptime
+    name: ${name} uptime
+    update_interval: 120s
+    
+  - platform: wifi_signal
+    name: ${name} wifi signal
+    update_interval: 120s
+
+light:
+  - platform: "tuya"
+    name: Porch Lights
+    dimmer_datapoint: 10
+    switch_datapoint: 9
+    min_value: 100
+    max_value: 1000
+
+fan:
+  - platform: "tuya"
+    name: Porch Fans
+    switch_datapoint: 1
+    speed_datapoint: 3
+    speed_count: 4
+
+
