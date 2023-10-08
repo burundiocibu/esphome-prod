@@ -1,0 +1,93 @@
+substitutions:
+  name: water-meter
+
+esphome:
+  name: water-meter
+  includes: hre.hpp
+  comment: "wemos d1-mini"
+
+esp8266:
+  board: d1_mini
+
+# Enable logging
+logger:
+  level: info
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "L7MT5jPHEtaShiu3CTtWKxmiEntnvfrVoZTtZPtcHEo="
+
+ota:
+  password: "bf084918ef35ed6dcedf1ea1f2ea9b78"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+web_server:
+  port: 80
+
+prometheus:
+
+dallas:
+  - pin: D3
+
+switch:
+  - platform: restart
+    name: ${name} restart
+
+sensor:
+  - platform: wifi_signal
+    name: "${name} Wifi Signal"
+    update_interval: 5s
+    filters:
+      - sliding_window_moving_average:
+          # hold 15 measurements, taken every 5 seconds
+          window_size: 15
+          # every 15 seconds, send the updated result..
+          send_every: 15
+
+  - platform: uptime
+    name: ${name} uptime
+    update_interval: 120s
+
+  - platform: custom
+    lambda: |-
+      auto hre = new HRE(D1, D2); // clock, data
+      App.register_component(hre);
+      return {
+        hre->usage_sensor,
+        hre->rate_sensor,
+        };
+    sensors:
+      - name: "${name} Usage"
+        unit_of_measurement: G
+        accuracy_decimals: 2
+      - name: "${name} Flow Rate"
+        unit_of_measurement: gpm
+        accuracy_decimals: 2
+
+  - platform: dallas
+    address: 0x8000000031622c28
+    name: ${name} board
+    filters:
+    - lambda: return x * (9.0/5.0) + 32.0;
+    accuracy_decimals: 2
+    unit_of_measurement: °F
+
+  - platform: dallas
+    address: 0x8701142fb8881b28
+    name: ${name} air
+    filters:
+    - lambda: return x * (9.0/5.0) + 32.0;
+    accuracy_decimals: 2
+    unit_of_measurement: °F
+
+  - platform: dallas
+    address: 0xc3021831f13eff28
+    name: ${name} plumbing
+    filters:
+    - lambda: return x * (9.0/5.0) + 32.0;
+    accuracy_decimals: 2
+    unit_of_measurement: °F
