@@ -21,7 +21,7 @@ logger:
   # The xiao esp32c3 seems to hang on reboot w/o a connected console
   # this seems to get around that. whatever
   baud_rate: 0
-  level: debug
+  level: info
 
 api:
   encryption:
@@ -87,3 +87,12 @@ sensor:
     filters:
     - lambda: return x * (9.0/5.0) + 32.0;
     unit_of_measurement: °F
+
+  - platform: dallas
+    address: 0x2c01187768f4ff28
+    name: ${name} meter
+    accuracy_decimals: 2
+    filters:
+    - lambda: return x * (9.0/5.0) + 32.0;
+    unit_of_measurement: °F
+    
