@@ -1,5 +1,6 @@
 # Hardware is olimex esp32 poe
 # https://www.olimex.com/Products/IoT/ESP32/ESP32-POE/open-source-hardware
+# TPS2375PW chip provides ethernet
 
 esphome:
   name: ble-poe-gw2
@@ -11,17 +12,18 @@ esp32:
   framework:
     type: esp-idf
 
-# Enable logging
 logger:
-  level: debug
+  level: info
 
-# Enable Home Assistant API
 api:
   encryption:
     key: "7JW1DLwPqhA/XcQhLu21FMTifE1sPY7nKEUyLocajNY="
 
 ota:
   password: "6796c660ba1ce3074cfb8cbe88aebd83"
+
+web_server:
+  port: 80
 
 ethernet:
   type: LAN8720
@@ -31,6 +33,15 @@ ethernet:
   phy_addr: 0
   power_pin: GPIO12
 
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+    timezone: America/Chicago
+
+text_sensor:
+  - platform: version
+    name: "ESPHome Version"
+
 esp32_ble_tracker:
   scan_parameters:
     interval: 1100ms
@@ -39,6 +50,11 @@ esp32_ble_tracker:
 
 bluetooth_proxy:
   active: true
+
+sensor:
+  - platform: uptime
+    name: uptime
+    update_interval: 120s
 
 button:
   - platform: safe_mode
