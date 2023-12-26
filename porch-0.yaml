@@ -1,18 +1,16 @@
+substitutions:
+  name: "porch-0"
+  update_interval: 15s
+
 esphome:
-  name: tree-fairies
-  friendly_name: Tree Fairies
-  platform: ESP8266
-  board: esp01_1m
-  comment: "H801"
+  name: ${name}
+  platform: ESP32
+  board: esp32dev
+  comment: "pico1"
 
 wifi:
   ssid: !secret ssid2
   password: !secret password2
-
-prometheus:
-
-web_server:
-  port: 80
 
 logger:
   level: info
@@ -20,6 +18,11 @@ logger:
 api:
 
 ota:
+
+prometheus:
+
+web_server:
+  port: 80
 
 time:
   - platform: homeassistant
@@ -32,7 +35,11 @@ text_sensor:
 
 switch:
   - platform: restart
-    name: "${name} restart"
+    name: ${name} restart
+
+dallas:
+  - pin: 14
+    update_interval: 15s
 
 sensor:
   - platform: uptime
@@ -42,14 +49,13 @@ sensor:
   - platform: wifi_signal
     name: ${name} wifi signal
     update_interval: 120s
-    
-output:
-  - platform: esp8266_pwm
-    pin: GPIO15
-    frequency: 1000 Hz
-    id: pwm
-    
-light:
-  - platform: monochromatic
-    name: "Tree fairies"
-    output: pwm
+  
+  - platform: dallas
+    address: 0xb23c01d07579b428
+    name: porch-0 temperature
+    accuracy_decimals: 2
+    filters:
+    - lambda: return x * (9.0/5.0) + 32.0;
+    unit_of_measurement: °F
+
+

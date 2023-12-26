@@ -28,16 +28,13 @@ time:
     id: homeassistant_time
     timezone: America/Chicago
 
-
 text_sensor:
   - platform: version
     name: "ESPHome Version"
 
-
 switch:
   - platform: restart
     name: "${name} restart"
-
 
 sensor:
   - platform: uptime
@@ -47,7 +44,6 @@ sensor:
   - platform: wifi_signal
     name: ${name} wifi signal
     update_interval: 120s
-
 
 binary_sensor:
   - platform: gpio
@@ -59,13 +55,11 @@ binary_sensor:
     on_press:
       - light.toggle: my_light
 
-
 light:
   - platform: binary
     name: "Pool Lights"
     id: my_light
     output: relay
-
 
 output:
   - platform: gpio

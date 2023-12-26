@@ -1,0 +1,55 @@
+substitutions:
+  name: "tree-ball-1"
+
+esphome:
+  name: ${name}
+  friendly_name: ${name}
+  comment: "MagiHome RGB"
+
+esp8266:
+  board: esp01_1m
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "oynMx1rN5Dl/XAjSsBb9FCVk4k2PWPCh+9TfS5uPaPE="
+
+ota:
+  password: "67c8982e789da8ebf1f87f6e38c24dde"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+web_server:
+  port: 80
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+    timezone: America/Chicago
+
+text_sensor:
+  - platform: version
+    name: "ESPHome Version"
+
+light:
+  - platform: rgb
+    name: ${name}
+    red: red_channel
+    green: green_channel
+    blue: blue_channel
+
+output:
+  - platform: esp8266_pwm
+    id: green_channel
+    pin: GPIO12
+  - platform: esp8266_pwm
+    id: red_channel
+    pin: GPIO5
+  - platform: esp8266_pwm
+    id: blue_channel
+    pin: GPIO13

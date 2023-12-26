@@ -3,7 +3,7 @@ substitutions:
 
 esphome:
   name: "water-meter"
-  friendly_name: "water-meter"
+  friendly_name: Water Meter
   comment: "seeed xiao esp32c3"
 
 preferences:
@@ -84,15 +84,11 @@ sensor:
     address: 0x78000801edbbb610
     name: ${name} board
     accuracy_decimals: 2
-    filters:
-    - lambda: return x * (9.0/5.0) + 32.0;
-    unit_of_measurement: °F
+    unit_of_measurement: °C
 
   - platform: dallas
     address: 0x2c01187768f4ff28
     name: ${name} meter
     accuracy_decimals: 2
-    filters:
-    - lambda: return x * (9.0/5.0) + 32.0;
-    unit_of_measurement: °F
+    unit_of_measurement: °C
     

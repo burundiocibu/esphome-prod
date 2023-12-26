@@ -13,6 +13,7 @@ wifi:
   password: !secret password2
 
 logger:
+  level: info
 
 api:
 
@@ -48,36 +49,27 @@ sensor:
 
   - platform: dallas
     address: 0x590119387D980028
-    name: ${name} temperature 1
+    name: tank into ground
     accuracy_decimals: 2
-    filters:
-    - lambda: return x * (9.0/5.0) + 32.0;
-    unit_of_measurement: °F
+    unit_of_measurement: °C
 
   - platform: dallas
     address: 0xC00119387D765A28
-    name: ${name} temperature 2
+    name: tank ambient
     accuracy_decimals: 2
-    filters:
-    - lambda: return x * (9.0/5.0) + 32.0;
-    unit_of_measurement: °F
+    unit_of_measurement: °C
 
   - platform: dallas
     address: 0x70011939F989F928
-    name: ${name} temperature 3
+    name: tank pump head
     accuracy_decimals: 2
-    filters:
-    - lambda: return x * (9.0/5.0) + 32.0;
-    unit_of_measurement: °F
+    unit_of_measurement: °C
 
   - platform: dallas
     address: 0xFB011939FFAF1328
-    name: ${name} temperature 4
+    name: tank check valve
     accuracy_decimals: 2
-    filters:
-    - lambda: return x * (9.0/5.0) + 32.0;
-    unit_of_measurement: °F
-
+    unit_of_measurement: °C
 
 dallas:
   pin:

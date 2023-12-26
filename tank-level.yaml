@@ -72,7 +72,5 @@ sensor:
   - platform: dallas
     address: 0xe203186bcbfaff28
     name: ${name} water temperature
-    filters:
-    - lambda: return x * (9.0/5.0) + 32.0;
     accuracy_decimals: 2
-    unit_of_measurement: °F
+    unit_of_measurement: °C
