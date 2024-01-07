@@ -1,0 +1,16 @@
+
+To generate an api key:
+
+openssl rand -base64 32
+
+
+api:
+  encryption:
+    key: "TDUqLDkhC9NjiONynxvkJxKpe0scFpEMHYcG2MHj8wQ="
+
+ota:
+  password: "64324a7cfb0667085cd88b751836c378"
+
+
+It appears that the olimex/ble gateways can't do prometheus with the idf
+

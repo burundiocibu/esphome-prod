@@ -6,13 +6,19 @@
 # IO13: G
 # IO15: R
 # IO16: status LED
+# To flash use esphome cli:
+# pip install wxesphomeflasher
+# esphomeflasher -p /dev/cu.usbserial-32230 --upload-baud-rate 115200 Downloads/noob8266.bin
+#  press and hold boot, presss and release reset, release boot
+#  while esphomeflasher is trying to connect to device
+
 substitutions:
   name: "porch-fairies"
 
 esphome:
   name: ${name}
   platform: ESP8266
-  board: esp01_1m
+  board: esp12e
   comment: "ElectroDragon"
 
 wifi:
@@ -35,16 +41,13 @@ time:
     id: homeassistant_time
     timezone: America/Chicago
 
-
 text_sensor:
   - platform: version
     name: "ESPHome Version"
 
-
 switch:
   - platform: restart
     name: "${name} restart"
-
 
 sensor:
   - platform: uptime
@@ -54,7 +57,6 @@ sensor:
   - platform: wifi_signal
     name: ${name} wifi signal
     update_interval: 120s
-    
 
 output:
   - platform: esp8266_pwm

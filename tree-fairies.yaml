@@ -18,8 +18,11 @@ logger:
   level: info
 
 api:
+  encryption:
+    key: "aIgBGyqR68z1R8rTCrlFEtcjhbSwjloRG0kVKS3wHTk="
 
 ota:
+  password: "wdQQvlWHXgcwnxvGsYxFWYSEnPFx6IHpt0ogzz2COPA="
 
 time:
   - platform: homeassistant

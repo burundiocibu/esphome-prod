@@ -14,7 +14,6 @@ esp32:
 logger:
   level: info
 
-# openssl rand -base64 32
 api:
   encryption:
     key: "TDUqLDkhC9NjiONynxvkJxKpe0scFpEMHYcG2MHj8wQ="
@@ -22,15 +21,15 @@ api:
 ota:
   password: "64324a7cfb0667085cd88b751836c378"
 
+web_server:
+  port: 80
+
 ethernet:
   type: LAN8720
   mdc_pin: GPIO23
   mdio_pin: GPIO18
   clk_mode: GPIO17_OUT
   phy_addr: 0
-
-web_server:
-  port: 80
 
 time:
   - platform: homeassistant
