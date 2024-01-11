@@ -1,14 +1,14 @@
-# hardware wemos d1-mini with a pair o fbme680s on I2C
+# hardware wemos d1-mini with a pair of bme680s on I2C
 # SCL on D1(gpio5) brown wire, SDA on D2(gpio4) orange wire
-
 substitutions:
-  name: downstairs-ac
+  me: downstairs-ac
 
 esphome:
-  name: ${name}
-  platform: ESP8266
-  board: d1_mini
+  name: ${me}
   comment: wemos d1 mini
+
+esp8266:
+  board: d1_mini
 
 wifi:
   ssid: !secret ssid2
@@ -23,6 +23,7 @@ api:
 
 ota:
   password: !secret esp_ota_pw
+  id: my_ota
 
 prometheus:
 
@@ -30,52 +31,48 @@ web_server:
 
 time:
   - platform: homeassistant
-    id: homeassistant_time
     timezone: America/Chicago
-
 
 text_sensor:
   - platform: version
-    name: "ESPHome Version"
-
+    name: ${me} ESPHome Version
 
 switch:
   - platform: restart
-    name: ${name} restart
-
+    name: ${me} restart
 
 sensor:
   - platform: uptime
-    name: ${name} uptime
+    name: ${me} uptime
     update_interval: 120s
 
   - platform: wifi_signal
-    name: ${name} wifi signal
+    name: ${me} wifi signal
     update_interval: 120s
 
   - platform: bme680
     address: 0x77
     update_interval: 1s
     temperature:
-      name: Return Temperature
+      name: ${me} return temperature
       id: t2
       accuracy_decimals: 2
       filters:
         - median
     pressure:
-      name: Return Pressure
+      name: ${me} return pressure
       id: p2
       accuracy_decimals: 4
       filters:
         - median
     humidity:
-      name: Return Humidity
+      name: ${me} return humidity
       id: h2
       accuracy_decimals: 1
       filters:
         - median
     gas_resistance:
-      name: Return Gas Resistance
+      name: ${me} return gas resistance
       id: g2
       accuracy_decimals: 1
       filters:
@@ -85,63 +82,63 @@ sensor:
     address: 0x76
     update_interval: 1s
     temperature:
-      name: Evaporator Temperature
+      name: ${me} evaporator temperature
       id: t1
       accuracy_decimals: 2
       filters:
         - median
     pressure:
-      name: Evaporator Pressure
+      name: ${me} evaporator pressure
       id: p1
       accuracy_decimals: 4
       filters:
         - median
     humidity:
-      name: Evaporator Humidity
+      name: ${me} evaporator humidity
       id: h1
       accuracy_decimals: 1
       filters:
         - median
     gas_resistance:
-      name: Evaporator Gas Resistance
+      name: ${me} evaporator gas resistance
       id: g1
       filters:
         - median
 
   - platform: template
-    name: Downstairs AC Tr-Te
+    name: ${me} Tr-Te
     lambda: return id(t2).state - id(t1).state;
     accuracy_decimals: 2
     unit_of_measurement: °C
 
   - platform: template
-    name: Downstairs AC Pr-Pe
+    name: ${me} Pr-Pe
     lambda: return id(p2).state - id(p1).state;
     unit_of_measurement: hPa
     accuracy_decimals: 2
 
   - platform: template
-    name: Evaporator Dewpoint
+    name: ${me} evaporator dewpoint
     unit_of_measurement: °C
     lambda: return (243.5*(log(id(h1).state/100)+((17.67*id(t1).state)/(243.5+id(t1).state)))/(17.67-log(id(h1).state/100)-((17.67*id(t1).state)/(243.5+id(t1).state))));
     id: td1
     accuracy_decimals: 1
 
   - platform: template
-    name: Return Dewpoint
+    name: ${me} return dewpoint
     lambda: return (243.5*(log(id(h2).state/100)+((17.67*id(t2).state)/(243.5+id(t2).state)))/(17.67-log(id(h2).state/100)-((17.67*id(t2).state)/(243.5+id(t2).state))));
     id: td2
     accuracy_decimals: 1
     unit_of_measurement: °C
 
   - platform: template
-    name: Downstairs AC TDr-TDe
+    name: ${me} TDr-TDe
     lambda: return id(td2).state - id(td1).state;
     unit_of_measurement: hPa
     accuracy_decimals: 2
 
   - platform: template
-    name: Evaporator absolute humidity
+    name: ${me} evaporator absolute humidity
     lambda: |-
       const float mw = 18.01534;    // molar mass of water g/mol
       const float r = 8.31447215;   // Universal gas constant J/mol/K
@@ -154,7 +151,7 @@ sensor:
     unit_of_measurement: 'g/m³'
 
   - platform: template
-    name: Return absolute humidity
+    name: ${me} return absolute humidity
     lambda: |-
       const float mw = 18.01534;    // molar mass of water g/mol
       const float r = 8.31447215;   // Universal gas constant J/mol/K
@@ -165,7 +162,6 @@ sensor:
     update_interval: 15s
     icon: 'mdi:water'
     unit_of_measurement: 'g/m³'
-
 
 i2c:
   sda: D2

@@ -1,24 +1,22 @@
 substitutions:
-  name: "driveway-flood"
-
+  me: driveway-flood
 esphome:
-  name: ${name}
-  friendly_name: "Driveway Flood"
-  comment: "Sonoff basic"
+  name: ${me}
+  comment: Sonoff basic
 
 esp8266:
   board: esp01_1m
 
-# Enable logging
 logger:
+  level: info
 
-# Enable Home Assistant API
 api:
   encryption:
-    key: "weDcHH6uppTGit35hFwUuHDRQad9+vdhFA6Eyu+6848="
+    key: !secret esp_api_key
 
 ota:
-  password: "777c121f2ed0ff16f3b6c88e00fc5700"
+  password: !secret esp_ota_pw
+  id: my_ota
 
 wifi:
   ssid: !secret wifi_ssid
@@ -31,19 +29,19 @@ web_server:
 
 text_sensor:
   - platform: version
-    name: ESPHome Version
+    name: ${me} ESPHome Version
 
 switch:
   - platform: restart
-    name: Restart
+    name: ${me} restart
 
 sensor:
   - platform: uptime
-    name: Uptime
+    name: ${me} uptime
     update_interval: 120s
     
   - platform: wifi_signal
-    name: wifi signal
+    name: ${me} wifi signal
     update_interval: 120s
 
 binary_sensor:
@@ -52,13 +50,13 @@ binary_sensor:
       number: GPIO0
       mode: INPUT_PULLUP
       inverted: True
-    name: Button
+    name: ${me} button
     on_press:
       - light.toggle: my_light
 
 light:
   - platform: binary
-    name: Light
+    name: Driveway Flood Light
     id: my_light
     output: relay
 

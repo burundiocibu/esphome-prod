@@ -1,9 +1,12 @@
+substitutions:
+  me: tree-fairies
+  
 esphome:
-  name: tree-fairies
-  friendly_name: Tree Fairies
-  platform: ESP8266
+  name: ${me}
+  comment: H801
+
+esp8266:
   board: esp01_1m
-  comment: "H801"
 
 wifi:
   ssid: !secret ssid2
@@ -19,31 +22,31 @@ logger:
 
 api:
   encryption:
-    key: "aIgBGyqR68z1R8rTCrlFEtcjhbSwjloRG0kVKS3wHTk="
+    key: !secret esp_api_key
 
 ota:
-  password: "wdQQvlWHXgcwnxvGsYxFWYSEnPFx6IHpt0ogzz2COPA="
+  password: !secret esp_ota_pw
+  id: my_ota
 
 time:
   - platform: homeassistant
-    id: homeassistant_time
     timezone: America/Chicago
 
 text_sensor:
   - platform: version
-    name: "ESPHome Version"
+    name: ${me} ESPHome Version
 
 switch:
   - platform: restart
-    name: "${name} restart"
+    name: ${me} restart
 
 sensor:
   - platform: uptime
-    name: ${name} uptime
+    name: ${me} uptime
     update_interval: 120s
     
   - platform: wifi_signal
-    name: ${name} wifi signal
+    name: ${me} wifi signal
     update_interval: 120s
     
 output:
@@ -54,5 +57,5 @@ output:
     
 light:
   - platform: monochromatic
-    name: "Tree fairies"
+    name: Tree fairies
     output: pwm

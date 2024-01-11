@@ -1,24 +1,29 @@
 # Wemos d1 mini
 # DS18B20 on D3
-
 substitutions:
-  name: porch-1
+  me: porch-1
 
 esphome:
-  name: ${name}
-  platform: ESP8266
+  name: ${me}
+  comment: wemos d1-mini
+
+esp8266:
   board: d1_mini
-  comment: "wemos d1-mini"
 
 wifi:
   ssid: !secret ssid2
   password: !secret password2
 
 logger:
+  level: info
 
 api:
+  encryption:
+    key: !secret esp_api_key
 
 ota:
+  password: !secret esp_ota_pw
+  id: my_ota
 
 prometheus:
 
@@ -27,33 +32,30 @@ web_server:
 
 time:
   - platform: homeassistant
-    id: homeassistant_time
     timezone: America/Chicago
 
 text_sensor:
   - platform: version
-    name: "ESPHome Version"
+    name: ${me} ESPHome Version
 
 switch:
   - platform: restart
-    name: ${name} restart
+    name: ${me} restart
 
 sensor:
   - platform: uptime
-    name: ${name} uptime
+    name: ${me} uptime
     update_interval: 120s
 
   - platform: wifi_signal
-    name: ${name} wifi signal
+    name: ${me} wifi signal
     update_interval: 120s
 
   - platform: dallas
     address: 0xBB0118776477FF28
-    name: ${name} temperature
+    name: ${me} temperature
     accuracy_decimals: 2
-    filters:
-    - lambda: return x * (9.0/5.0) + 32.0;
-    unit_of_measurement: °F
+    unit_of_measurement: °C
 
 dallas:
   - pin: D3

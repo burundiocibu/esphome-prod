@@ -1,12 +1,12 @@
 # This is for a sonoff S31 power measuring socket (not the lite version)
 substitutions:
-  name: "back-tap-tapes"
+  me: back-tap-tapes
 
 esphome:
-  name: ${name}
+  name: ${me}
   platform: ESP8266
   board: esp01_1m
-  comment: "Sonoff S31"
+  comment: Sonoff S31
 
 wifi:
   ssid: !secret ssid2
@@ -21,29 +21,28 @@ logger:
   baud_rate: 0 # required for the cse7766 to work
   level: info
 
-# Enable Home Assistant API
 api:
   encryption:
-    key: "Pl8WeeEqzJ07UpawKB4YVIQKWBx2pJpTqXOQNlOUAYM="
+    key: !secret esp_api_key
 
 ota:
-  password: "bff5f4b132c436d1a87c80d25baadced"
+  password: !secret esp_ota_pw
+  id: my_ota
 
 time:
   - platform: homeassistant
-    id: homeassistant_time
     timezone: America/Chicago
 
 text_sensor:
   - platform: version
-    name: "ESPHome Version"
+    name: ${me} ESPHome Version
 
 switch:
   - platform: restart
-    name: "${name} restart"
+    name: restart
 
   - platform: gpio
-    name: "${name} relay"
+    name: ${me} relay
     pin: GPIO12
     restore_mode: RESTORE_DEFAULT_ON
     id: relay
@@ -51,24 +50,24 @@ switch:
 
 sensor:
   - platform: uptime
-    name: ${name} uptime
+    name: ${me} uptime
     update_interval: 120s
     
   - platform: wifi_signal
-    name: ${name} wifi signal
+    name: ${me} wifi signal
     update_interval: 120s
     
   - platform: cse7766
     current:
-      name: "${name} current"
+      name: ${me} current
       accuracy_decimals: 2
       filters:
         multiply: 0.951
     voltage:
-      name: "${name} voltage"
+      name: ${me} voltage
       accuracy_decimals: 1
     power:
-      name: "${name} power"
+      name: ${me} power
       id: power
       accuracy_decimals: 0
       filters:
@@ -76,7 +75,7 @@ sensor:
     update_interval: 15s
 
   - platform: total_daily_energy
-    name: ${name} daily energy
+    name: ${me} daily energy
     power_id: power
     filters:
       - multiply: 0.001
@@ -88,7 +87,7 @@ binary_sensor:
       number: GPIO0
       mode: INPUT_PULLUP
       inverted: True
-    name: "${name} button"
+    name: ${me} button
     on_press:
       - switch.toggle: relay
 

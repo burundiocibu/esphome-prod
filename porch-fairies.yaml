@@ -6,20 +6,15 @@
 # IO13: G
 # IO15: R
 # IO16: status LED
-# To flash use esphome cli:
-# pip install wxesphomeflasher
-# esphomeflasher -p /dev/cu.usbserial-32230 --upload-baud-rate 115200 Downloads/noob8266.bin
-#  press and hold boot, presss and release reset, release boot
-#  while esphomeflasher is trying to connect to device
-
 substitutions:
-  name: "porch-fairies"
+  me: porch-fairies
 
 esphome:
-  name: ${name}
-  platform: ESP8266
+  name: ${me}
+  comment: ElectroDragon
+
+esp8266:
   board: esp12e
-  comment: "ElectroDragon"
 
 wifi:
   ssid: !secret ssid2
@@ -31,31 +26,35 @@ web_server:
   port: 80
 
 logger:
+  level: info
 
 api:
+  encryption:
+    key: !secret esp_api_key
 
 ota:
+  password: !secret esp_ota_pw
+  id: my_ota
 
 time:
   - platform: homeassistant
-    id: homeassistant_time
     timezone: America/Chicago
 
 text_sensor:
   - platform: version
-    name: "ESPHome Version"
+    name: ${me} ESPHome Version
 
 switch:
   - platform: restart
-    name: "${name} restart"
+    name: ${me} restart
 
 sensor:
   - platform: uptime
-    name: ${name} uptime
+    name: ${me} uptime
     update_interval: 120s
-    
+
   - platform: wifi_signal
-    name: ${name} wifi signal
+    name: ${me} wifi signal
     update_interval: 120s
 
 output:
@@ -65,15 +64,25 @@ output:
     id: blue_pwm
 
   - platform: esp8266_pwm
-    pin: GPIO15
+    pin: GPIO13
     frequency: 1000 Hz
     id: green_pwm
-    
+
+  - platform: esp8266_pwm
+    pin: GPIO14
+    frequency: 1000 Hz
+    id: white_pwm
+
+  - platform: esp8266_pwm
+    pin: GPIO15
+    frequency: 1000 Hz
+    id: red_pwm
+
 light:
   - platform: monochromatic
-    name: "N. Porch fairies"
-    output: blue_pwm
+    name: N. Porch fairies
+    output: green_pwm
 
   - platform: monochromatic
-    name: "S. Porch fairies"
-    output: green_pwm
+    name: S. Porch fairies
+    output: blue_pwm

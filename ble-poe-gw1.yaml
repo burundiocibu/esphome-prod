@@ -1,10 +1,10 @@
 # Hardware is olimex esp32 poe
 # https://www.olimex.com/Products/IoT/ESP32/ESP32-POE/open-source-hardware
 # TPS2375PW chip provides ethernet
-
+substitutions:
+  me: ble-poe-gw1
 esphome:
-  name: ble-poe-gw1
-  friendly_name: ble-poe-gw1
+  name: ${me}
   comment: olimex esp32 poe
 
 esp32:
@@ -17,10 +17,11 @@ logger:
 
 api:
   encryption:
-    key: "+yOCyfllIyF4JkJ3AJuComa7Q7BSDBLVM9kV8FKb3TM="
+    key: !secret esp_api_key
 
 ota:
-  password: "6796c660ba1ce3074cfb8cbe88aebd83"
+  password: !secret esp_ota_pw
+  id: my_ota
 
 web_server:
   port: 80
@@ -35,12 +36,11 @@ ethernet:
 
 time:
   - platform: homeassistant
-    id: homeassistant_time
     timezone: America/Chicago
 
 text_sensor:
   - platform: version
-    name: "ESPHome Version"
+    name: ${me} ESPHome Version
 
 esp32_ble_tracker:
   scan_parameters:
@@ -53,10 +53,10 @@ bluetooth_proxy:
 
 sensor:
   - platform: uptime
-    name: uptime
+    name: ${me} uptime
     update_interval: 120s
 
 button:
   - platform: safe_mode
-    name: Safe Mode Boot
+    name: ${me} safe mode boot
     entity_category: diagnostic

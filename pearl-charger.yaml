@@ -1,12 +1,12 @@
 # This is for a sonoff S31 power measuring socket (not the lite version)
 substitutions:
-  name: "pearl-charger"
-
+  me: pearl-charger
 esphome:
-  name: ${name}
-  platform: ESP8266
+  name: ${me}
+  comment: Sonoff S31
+
+esp8266:
   board: esp01_1m
-  comment: "Sonoff S31"
 
 wifi:
   ssid: !secret ssid2
@@ -24,28 +24,26 @@ logger:
 # Enable Home Assistant API
 api:
   encryption:
-    key: "Pl8WeeEqzJ07UpawKB4YVIQKWBx2pJpTqXOQNlOUAYM="
+    key: !secret esp_api_key
 
 ota:
-  password: "bff5f4b132c436d1a87c80d25baadced"
+  password: !secret esp_ota_pw
+  id: my_ota
 
 time:
   - platform: homeassistant
-    id: homeassistant_time
     timezone: America/Chicago
-
 
 text_sensor:
   - platform: version
-    name: "ESPHome Version"
-
+    name: ${me} ESPHome Version
 
 switch:
   - platform: restart
-    name: "${name} restart"
+    name: ${me} restart
 
   - platform: gpio
-    name: "${name} relay"
+    name: ${me} relay
     pin: GPIO12
     restore_mode: RESTORE_DEFAULT_ON
     id: relay
@@ -54,24 +52,24 @@ switch:
 
 sensor:
   - platform: uptime
-    name: ${name} uptime
+    name: ${me} uptime
     update_interval: 120s
-    
+
   - platform: wifi_signal
-    name: ${name} wifi signal
+    name: ${me} wifi signal
     update_interval: 120s
-    
+
   - platform: cse7766
     current:
-      name: "${name} current"
+      name: ${me} current
       accuracy_decimals: 2
       filters:
         multiply: 0.951
     voltage:
-      name: "${name} voltage"
+      name: ${me} voltage
       accuracy_decimals: 1
     power:
-      name: "${name} power"
+      name: ${me} power
       id: power
       accuracy_decimals: 0
       filters:
@@ -79,7 +77,7 @@ sensor:
     update_interval: 15s
 
   - platform: total_daily_energy
-    name: ${name} daily energy
+    name: ${me} daily energy
     power_id: power
     filters:
       - multiply: 0.001
@@ -91,16 +89,13 @@ binary_sensor:
       number: GPIO0
       mode: INPUT_PULLUP
       inverted: True
-    name: "${name} button"
+    name: ${me} button
     on_press:
       - switch.toggle: relay
-
 
 status_led:
   pin: GPIO13
 
-
 uart:
   rx_pin: RX
   baud_rate: 4800
-

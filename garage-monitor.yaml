@@ -1,23 +1,28 @@
 # hardware wemos d1-mini with AM2301 on D2
 substitutions:
-  name: garage-monitor
-
+  me: garage-monitor
+  
 esphome:
-  name: ${name}
-  platform: ESP8266
-  board: d1_mini
-  comment: "wemos d1"
+  name: ${me}
+  comment: wemos d1
 
+esp8266:
+  board: d1_mini
 
 wifi:
   ssid: !secret ssid2
   password: !secret password2
 
 logger:
+  level: info
 
 api:
+  encryption:
+    key: !secret esp_api_key
 
 ota:
+  password: !secret esp_ota_pw
+  id: my_ota
 
 prometheus:
 
@@ -25,34 +30,30 @@ web_server:
   port: 80
 
 time:
-  - platform: sntp
-    id: sntp_time
+  - platform: homeassistant
     timezone: America/Chicago
-
 
 text_sensor:
   - platform: version
-    name: "ESPHome Version"
-
+    name: ${me}ESPHome Version
 
 switch:
   - platform: restart
-    name: ${name} restart
-
+    name: ${me} restart
 
 sensor:  
   - platform: uptime
-    name: ${name} uptime
+    name: ${me} uptime
     update_interval: 120s
     
   - platform: wifi_signal
-    name: ${name} wifi signal
+    name: ${me} wifi signal
     update_interval: 120s
 
   - platform: dht
     pin: D2
     temperature:
-      name: "Garage Temperature"
+      name: Garage Temperature
     humidity:
-      name: "Garage Humidity"
+      name: Garage Humidity
     update_interval: 15s

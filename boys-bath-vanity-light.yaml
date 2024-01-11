@@ -1,27 +1,26 @@
 # This is for a treatlife SS01S  
 substitutions:
-  name: "boys-bath-vanity-light"
-  me: "boys_bath_vanity_light"
+  me: boys-bath-vanity-light
   on_time: 600s
 
 esphome:
-  name: ${name}
-  platform: ESP8266
-  board: esp01_1m
+  name: ${me}
+  comment: Treatlife SS01S
   on_boot:
     priority: 200
     then:
       - output.turn_on: white_led
       - output.turn_off: red_led
-  comment: "SS01S"
+
+esp8266:
+  board: esp01_1m
 
 wifi:
   ssid: !secret ssid2
   password: !secret password2
 
-
 logger:
-  level: verbose
+  level: info
 
 prometheus:
 
@@ -29,24 +28,33 @@ web_server:
   port: 80
 
 api:
+  encryption:
+    key: !secret esp_api_key
 
 ota:
+  password: !secret esp_ota_pw
+  id: my_ota
 
 time:
   - platform: homeassistant
-    id: homeassistant_time
     timezone: America/Chicago
-
 
 text_sensor:
   - platform: version
-    name: "ESPHome Version"
-
+    name: ${me} ESPHome Version
 
 switch:
   - platform: restart
-    name: "${name} restart"
+    name: ${me} restart
 
+sensor:
+  - platform: uptime
+    name:  ${me} uptime
+    update_interval: 120s
+    
+  - platform: wifi_signal
+    name:  ${me} uptimwifi signal
+    update_interval: 120s
 
 output:
   - platform: gpio
@@ -63,11 +71,10 @@ output:
     id: relay
     pin: GPIO12
 
-
 light:
   - platform: binary
-    name: "Boys Bath Vanity Light"
-    id: ${me}
+    name: Boys Bath Vanity Light
+    id: my_light
     output: relay
     on_turn_on:
       - output.turn_off: white_led
@@ -75,24 +82,12 @@ light:
       - output.turn_on: white_led
       - output.turn_off: red_led
   
-
 script:
   - id: inching
     then:
-      - light.turn_on: ${me}
+      - light.turn_on: my_light
       - delay: ${on_time}
-      - light.turn_off: ${me}
-
-
-sensor:
-  - platform: uptime
-    name: ${name} uptime
-    update_interval: 120s
-    
-  - platform: wifi_signal
-    name: ${name} wifi signal
-    update_interval: 120s
-
+      - light.turn_off: my_light
 
 binary_sensor:
   - platform: gpio
@@ -104,10 +99,10 @@ binary_sensor:
     on_press:
       - if:
           condition:
-            light.is_on: ${me}
+            light.is_on: my_light
           then:
             - script.stop: inching
-            - light.turn_off: ${me}
+            - light.turn_off: my_light
           else:
             - script.execute: inching
     on_click:
@@ -119,7 +114,6 @@ binary_sensor:
               script.is_running: inching
             then:
               - script.stop: inching
-              - light.turn_on: ${me}
+              - light.turn_on: my_light
               - output.turn_off: white_led
               - output.turn_on: red_led
-              

@@ -1,12 +1,12 @@
-# This is for a sonoff basic switch module
 substitutions:
-  name: "plant-babies-1"
+  me: plant-babies-1
 
 esphome:
-  name: ${name}
-  platform: ESP8266
+  name: ${me}
+  comment: Sonoff basic
+
+esp8266:
   board: esp01_1m
-  comment: "Sonoff basic"
 
 wifi:
   ssid: !secret ssid2
@@ -18,36 +18,36 @@ web_server:
   port: 80
 
 logger:
+  level: debug
 
 api:
+  encryption:
+    key: !secret esp_api_key
 
 ota:
+  password: !secret esp_ota_pw
+  id: my_ota
 
 time:
   - platform: homeassistant
-    id: homeassistant_time
     timezone: America/Chicago
-
 
 text_sensor:
   - platform: version
-    name: "ESPHome Version"
-
+    name: ${me} ESPHome Version
 
 switch:
   - platform: restart
-    name: "${name} restart"
-
+    name: ${me} restart
 
 sensor:
   - platform: uptime
-    name: ${name} uptime
+    name: ${me} uptime
     update_interval: 120s
-    
+
   - platform: wifi_signal
-    name: ${name} wifi signal
+    name: ${me} wifi signal
     update_interval: 120s
-    
 
 binary_sensor:
   - platform: gpio
@@ -55,24 +55,20 @@ binary_sensor:
       number: GPIO0
       mode: INPUT_PULLUP
       inverted: True
-    name: "${name} button"
+    name: ${me} button
     on_press:
       - light.toggle: my_light
 
-
 light:
   - platform: binary
-    name: "Plant Babies 1"
+    name: Plant Babies 1
     id: my_light
     output: relay
-    
 
 output:
   - platform: gpio
     pin: GPIO12
     id: relay
-  
 
 status_led:
   pin: GPIO13
-

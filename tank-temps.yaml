@@ -1,12 +1,16 @@
 # hardware wemos d1-mini with a string of DS18B20 sensors
 substitutions:
-  name: tank-temps
+  me: tank-temps
 
 esphome:
-  name: ${name}
-  platform: ESP8266
-  board: d1_mini
+  name: ${me}
   comment: "wemos d1-mini"
+  on_boot:
+    - lambda: |-
+        id(my_ota).set_auth_password("9f47a47302bb0eb644fa82fe1d75c67a");
+
+esp8266:
+  board: d1_mini
 
 wifi:
   ssid: !secret ssid2
@@ -16,9 +20,12 @@ logger:
   level: info
 
 api:
+  encryption:
+    key: !secret esp_api_key
 
 ota:
   password: "98990a48086e1c416ed715916cea6066"
+  id: my_ota
 
 prometheus:
 
@@ -27,24 +34,23 @@ web_server:
 
 time:
   - platform: homeassistant
-    id: homeassistant_time
     timezone: America/Chicago
 
 text_sensor:
   - platform: version
-    name: "ESPHome Version"
+    name: ${me} ESPHome Version
 
 switch:
   - platform: restart
-    name: ${name} restart
+    name: ${me} restart
 
 sensor:
   - platform: uptime
-    name: ${name} uptime
+    name: ${me} uptime
     update_interval: 120s
 
   - platform: wifi_signal
-    name: ${name} wifi signal
+    name: ${me} wifi signal
     update_interval: 120s
 
   - platform: dallas

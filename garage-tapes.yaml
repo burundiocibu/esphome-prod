@@ -1,26 +1,29 @@
 # Hardware is a Shelly 1PM
 # https://www.esphome-devices.com/devices/Shelly-1PM
 substitutions:
-  name: garage-tapes
+  me: garage-tapes
 
 esphome:
-  name: ${name}
-  platform: ESP8266
+  name: ${me}
+  comment: Shelly 1PM
+
+esp8266:
   board: esp01_1m
-  comment: "Shelly 1PM"
 
 wifi:
   ssid: !secret ssid2
   password: !secret password2
-  power_save_mode: HIGH # for ESP8266 LOW/HIGH are mixed up, esphome/issues/issues/1532
 
-# Enable logging
 logger:
+  level: info
 
-# Enable various APIs
 api:
+  encryption:
+    key: !secret esp_api_key
 
 ota:
+  password: !secret esp_ota_pw
+  id: my_ota
 
 prometheus:
 
@@ -29,38 +32,33 @@ web_server:
 
 time:
   - platform: homeassistant
-    id: homeassistant_time
     timezone: America/Chicago
-
 
 text_sensor:
   - platform: version
-    name: "ESPHome Version"
-
+    name: ${me} ESPHome Version
 
 switch:
   - platform: restart
-    name: ${name} restart
+    name: ${me} restart
 
   - platform: gpio
-    name: ${name} relay
+    name: ${me} relay
     id: relay
     pin: GPIO15
-
 
 status_led:
   pin:
     number: GPIO0
     inverted: yes
 
-
 sensor:
   - platform: uptime
-    name: ${name} uptime
+    name: ${me} uptime
     update_interval: 120s
 
   - platform: wifi_signal
-    name: ${name} wifi signal
+    name: ${me} wifi signal
     update_interval: 120s
 
   - platform: hlw8012
@@ -68,9 +66,9 @@ sensor:
     cf1_pin: GPIO13 # not used because it is not available on the 1PM but it is needed to compile
     sel_pin: GPIO14 # ditto
     power:
-      name: "${name} power"
+      name: ${me} power
       unit_of_measurement: W
-      id: "power"
+      id: power
       device_class: power
       state_class: measurement
       accuracy_decimals: 1
@@ -90,7 +88,7 @@ sensor:
     update_interval: 15s
 
   - platform: total_daily_energy
-    name: "${name} daily energy"
+    name: ${me} daily energy
     power_id: power
     device_class: energy
     state_class: measurement
@@ -98,8 +96,8 @@ sensor:
 
   - platform: ntc
     sensor: temp_resistance_reading
-    name: "${name} temperature"
-    unit_of_measurement: "°C"
+    name: ${me} temperature
+    unit_of_measurement: °C
     accuracy_decimals: 1
     device_class: temperature
     calibration:
@@ -112,16 +110,17 @@ sensor:
           - homeassistant.event:
               event: esphome.overheat
               data:
-                title: "${name} has overheated."
+                title: "device overheated"
+
   - platform: resistance
     id: temp_resistance_reading
     sensor: temp_analog_reading
     configuration: DOWNSTREAM
     resistor: 32kOhm
+
   - platform: adc
     id: temp_analog_reading
     pin: A0
-
 
 binary_sensor:
   - platform: gpio
@@ -129,8 +128,7 @@ binary_sensor:
       number: GPIO4
     filters:
       - delayed_on_off: 50ms # small delay to prevent debouncing
-    name: "${name} switch"
+    name: ${me} button
     on_press:
       then:
         - switch.toggle: relay
-  #  internal: true

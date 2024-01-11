@@ -1,13 +1,14 @@
 # This is for a sonoff POW R1 switch module
 # https://www.esphome-devices.com/devices/Sonoff-POW-R1
 substitutions:
-  name: "tank-tapes"
+  me: tank-tapes
 
 esphome:
-  name: ${name}
-  platform: ESP8266
+  name: ${me}
+  comment: Sonoff POW R1
+
+esp8266:
   board: esp01_1m
-  comment: "Sonoff POW R1"
 
 wifi:
   ssid: !secret ssid2
@@ -19,21 +20,23 @@ web_server:
   port: 80
 
 logger:
+  level: info
 
 api:
+  encryption:
+    key: !secret esp_api_key
 
 ota:
+  password: !secret esp_ota_pw
+  id: my_ota
 
 time:
   - platform: homeassistant
-    id: homeassistant_time
     timezone: America/Chicago
-
 
 text_sensor:
   - platform: version
-    name: "ESPHome Version"
-
+    name: ${me} ESPHome Version
 
 binary_sensor:
   - platform: gpio
@@ -41,7 +44,7 @@ binary_sensor:
       number: GPIO0
       mode: INPUT_PULLUP
       inverted: True
-    name: Tank Tapes Button
+    id: button
     on_press:
       - switch.toggle: fakebutton
 
@@ -60,14 +63,13 @@ binary_sensor:
         return false;
       }
 
-
 sensor:
   - platform: uptime
-    name: ${name} uptime
+    name: ${me} uptime
     update_interval: 120s
     
   - platform: wifi_signal
-    name: ${name} wifi signal
+    name: ${me} wifi signal
     update_interval: 120s
 
   - platform: hlw8012
@@ -76,11 +78,11 @@ sensor:
     cf1_pin: 13
     update_interval: 2s
     current:
-      name: Tank Tapes Current
+      name: ${me} current
     voltage:
-      name: Tank Tapes Voltage
+      name: ${me} voltage
     power:
-      name: Tank Tapes Power
+      name: ${me} power
       id: power
       on_value_range:
         - above: 4.0
@@ -90,13 +92,12 @@ sensor:
           then:
             - light.turn_off: led
 
-
 switch:
   - platform: restart
-    name: "${name} restart"
+    name: ${me} restart
 
   - platform: template
-    name: "Tank Tapes"
+    name: Tank Tapes
     optimistic: true
     id: fakebutton
     turn_on_action:
@@ -110,14 +111,12 @@ switch:
     id: relay
     pin: GPIO12
 
-
 output:
   - platform: esp8266_pwm
     id: pow_blue_led
     pin:
       number: GPIO15
       inverted: True
-
 
 light:
   - platform: monochromatic

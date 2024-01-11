@@ -1,10 +1,9 @@
 substitutions:
-  name: olla-water
-  on_time: 600s
+  me: olla-water
 
 esphome:
-  name: ${name}
-  comment: "TinyPico32"
+  name: ${me}
+  comment: TinyPico32
 
 esp32:
   board: esp32dev
@@ -19,8 +18,12 @@ logger:
   level: info
 
 api:
+  encryption:
+    key: !secret esp_api_key
 
 ota:
+  password: !secret esp_ota_pw
+  id: my_ota
 
 prometheus:
 
@@ -29,44 +32,33 @@ web_server:
   
 time:
   - platform: homeassistant
-    id: homeassistant_time
     timezone: America/Chicago
 
 text_sensor:
   - platform: version
-    name: "ESPHome Version"
-
-#esp32_ble_tracker:
-#  scan_parameters:
-#    interval: 1100ms
-#    window: 1100ms
-#    active: true
-
-#bluetooth_proxy:
-#  active: true
-
+    name: ${me} ESPHome Version
 
 switch:
   - platform: restart
-    name: ${name} restart
+    name: ${me} restart
 
   - platform: gpio
-    name: ${name}-valve
+    name: ${me} valve
     id: valve
     pin: 21
 
 sensor:
   - platform: uptime
-    name: ${name} uptime
+    name: ${me} uptime
     update_interval: 120s
     
   - platform: wifi_signal
-    name: ${name} wifi signal
+    name: ${me} wifi signal
     update_interval: 120s
 
   - platform: pulse_counter
     pin: 32
-    name: ${name} flow rate
+    name: ${me} flow rate
     internal: false
     unit_of_measurement: 'gal/min'
     update_interval: 5s
@@ -75,7 +67,7 @@ sensor:
       # 1928 pulses = 127 oz
       - multiply: 0.0005146200726141079 
     total:
-      name: ${name} volume
+      name: volume
       unit_of_measurement: 'gal'
       accuracy_decimals: 2
       filters: 
@@ -85,5 +77,5 @@ script:
   - id: inching
     then:
       - switch.turn_on: valve
-      - delay: ${on_time}
+      - delay: 5min
       - switch.turn_off: valve

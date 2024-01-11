@@ -1,20 +1,20 @@
 # This is for a treatlife DS03 three way wall dimmer switch
-# 
 substitutions:
-  name: "porch-fans-lights"
+  me: porch-fans-lights
 
 esphome:
-  name: ${name}
-  platform: ESP8266
+  name: ${me}
+  comment: DS03
+
+esp8266:
   board: esp01_1m
-  comment: "DS03"
 
 wifi:
   ssid: !secret ssid2
   password: !secret password2
 
 logger:
-  level: debug
+  level: info
   baud_rate: 0 # dimmer uses serial
 
 prometheus:
@@ -23,8 +23,12 @@ web_server:
   port: 80
 
 api:
+  encryption:
+    key: !secret esp_api_key
 
 ota:
+  password: !secret esp_ota_pw
+  id: my_ota
 
 uart:
   id: uart_bus
@@ -36,29 +40,24 @@ tuya:
 
 time:
   - platform: homeassistant
-    id: homeassistant_time
     timezone: America/Chicago
-
 
 text_sensor:
   - platform: version
-    name: "ESPHome Version"
-
+    name: ${me} ESPHome Version
 
 switch:
   - platform: restart
-    name: "${name} restart"
-
+    name: ${me} restart
 
 sensor:
   - platform: uptime
-    name: ${name} uptime
-    update_interval: 120s
-    
-  - platform: wifi_signal
-    name: ${name} wifi signal
+    name: ${me} uptime
     update_interval: 120s
 
+  - platform: wifi_signal
+    name: ${me} wifi signal
+    update_interval: 120s
 
 light:
   - platform: "tuya"
@@ -67,7 +66,6 @@ light:
     switch_datapoint: 9
     min_value: 100
     max_value: 1000
-
 
 fan:
   - platform: "tuya"

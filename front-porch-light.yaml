@@ -1,23 +1,23 @@
 substitutions:
-  name: front-porch-light
-  
+  me: front-porch-light
+
 esphome:
-  name: ${name}
-  comment: "Shelly 1PM"
+  name: ${me}
+  comment: Shelly 1PM
 
 esp8266:
   board: esp01_1m
 
-# Enable logging
 logger:
+  level: info
 
-# Enable Home Assistant API
 api:
   encryption:
-    key: "xcAFHJT4H8b701Al6TlYD3l7Uq6j3nfJvk0hPEO29rw="
+    key: !secret esp_api_key
 
 ota:
-  password: "b3b42f6e428f3d14b3f714a779704097"
+  password: !secret esp_ota_pw
+  id: my_ota
 
 wifi:
   ssid: !secret wifi_ssid
@@ -26,15 +26,13 @@ wifi:
 web_server:
   port: 80
 
-
 text_sensor:
   - platform: version
-    name: "ESPHome Version"
-
+    name: ${me} ESPHome Version
 
 switch:
   - platform: restart
-    name: ${name} restart
+    name: ${me} restart
 
 output:
   - platform: gpio
@@ -43,7 +41,7 @@ output:
 
 light:
   - platform: binary
-    name: "Front Porch Light"
+    name: Front Porch Light
     output: relay
     on_turn_on:
       - output.turn_on: relay
@@ -52,11 +50,11 @@ light:
 
 sensor:
   - platform: uptime
-    name: ${name} uptime
+    name: ${me} uptime
     update_interval: 120s
     
   - platform: wifi_signal
-    name: ${name} wifi signal
+    name: ${me} wifi signal
     update_interval: 120s
 
   - platform: hlw8012
@@ -64,9 +62,9 @@ sensor:
     cf1_pin: GPIO13 # not used because it is not available on the 1PM but it is needed to compile
     sel_pin: GPIO14 # ditto
     power:
-      name: "${name} power"
+      name: ${me} power
       unit_of_measurement: W
-      id: "power"
+      id: power
       device_class: power
       state_class: measurement
       accuracy_decimals: 1
@@ -91,7 +89,7 @@ binary_sensor:
       number: GPIO4
     filters:
       - delayed_on_off: 50ms # small delay to prevent debouncing
-    name: "${name} switch"
+    name: ${me} toggle
     on_press:
       then:
         - output.turn_on: relay

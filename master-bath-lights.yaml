@@ -1,26 +1,26 @@
 # This is for a martin jerry mj-s01 wall switch
 # on breaker 5B?
 substitutions:
-  name: "master-bath-lights"
-  me: "master_bath_lights"
-  on_time: 1800s
+  me: master-bath-lights
 
 esphome:
-  name: ${name}
-  platform: ESP8266
-  board: esp01_1m
+  name: ${me}
+  comment: MJ-S01
   on_boot:
     priority: 200
     then:
       - output.turn_on: blue_led
       - output.turn_off: red_led
-  comment: "MJ-S01"
+
+esp8266:
+  board: esp01_1m
 
 wifi:
   ssid: !secret ssid2
   password: !secret password2
 
 logger:
+  level: info
 
 prometheus:
 
@@ -28,24 +28,24 @@ web_server:
   port: 80
 
 api:
+  encryption:
+    key: !secret esp_api_key
 
 ota:
+  password: !secret esp_ota_pw
+  id: my_ota
 
 time:
   - platform: homeassistant
-    id: homeassistant_time
     timezone: America/Chicago
-
 
 text_sensor:
   - platform: version
-    name: "ESPHome Version"
-
+    name: ${me} ESPHome Version
 
 switch:
   - platform: restart
-    name: "${name} restart"
-
+    name: ${me} restart
 
 output:
   - platform: gpio
@@ -62,11 +62,10 @@ output:
     id: relay
     pin: GPIO12
 
-
 light:
   - platform: binary
-    name: "Master Bath Lights"
-    id: ${me}
+    name: Master Bath Lights
+    id: my_light
     output: relay
     on_turn_on:
       - output.turn_off: blue_led
@@ -74,26 +73,23 @@ light:
       - output.turn_on: blue_led
       - output.turn_off: red_led
 
-
 script:
   - id: inching
     then:
       - logger.log: "inching started" 
-      - light.turn_on: ${me}
-      - delay: ${on_time}
-      - light.turn_off: ${me}
+      - light.turn_on: my_light
+      - delay: 30min
+      - light.turn_off: my_light
       - logger.log: "inching done" 
-
 
 sensor:
   - platform: uptime
-    name: ${name} uptime
+    name: ${me} uptime
     update_interval: 120s
     
   - platform: wifi_signal
-    name: ${name} wifi signal
+    name: ${me} wifi signal
     update_interval: 120s
-
 
 binary_sensor:
   - platform: gpio
@@ -105,11 +101,11 @@ binary_sensor:
     on_press:
       - if:
           condition:
-            light.is_on: ${me}
+            light.is_on: my_light
           then:
             - logger.log: "inching killed" 
             - script.stop: inching
-            - light.turn_off: ${me}
+            - light.turn_off: my_light
           else:
             - script.execute: inching
     on_click:
@@ -122,7 +118,7 @@ binary_sensor:
             then:
               - logger.log: "inching killed" 
               - script.stop: inching
-              - light.turn_on: ${me}
+              - light.turn_on: my_light
               - output.turn_off: blue_led
               - output.turn_on: red_led
               - logger.log: "light on till switch press" 

@@ -2,25 +2,30 @@
 # bme280 on I2C
 # SCL on D1(gpio5) green wire, SDA on D2(gpio4) white wire
 # Vcc red, GND blk
-
 substitutions:
-  name: porch-3
+  me: porch-3
 
 esphome:
-  name: ${name}
-  platform: ESP8266
+  name: ${me}
+  comment: wemos d1-mini
+
+esp8266:
   board: d1_mini
-  comment: "wemos d1-mini"
 
 wifi:
   ssid: !secret ssid2
   password: !secret password2
 
 logger:
+  level: info
 
 api:
+  encryption:
+    key: !secret esp_api_key
 
 ota:
+  password: !secret esp_ota_pw
+  id: my_ota
 
 prometheus:
 
@@ -29,51 +34,46 @@ web_server:
 
 time:
   - platform: homeassistant
-    id: homeassistant_time
     timezone: America/Chicago
 
 text_sensor:
   - platform: version
-    name: "ESPHome Version"
+    name: ${me} ESPHome Version
 
 switch:
   - platform: restart
-    name: ${name} restart
+    name: ${me} restart
 
 sensor:
   - platform: uptime
-    name: ${name} uptime
+    name: ${me} uptime
     update_interval: 120s
 
   - platform: wifi_signal
-    name: ${name} wifi signal
+    name: ${me} wifi signal
     update_interval: 120s
 
   - platform: bme280
     address: 0x76
     update_interval: 15s
     temperature:
+      name: ${me} temperature
       id: bme280_temperature
       internal: true
       unit_of_measurement: °C
 
     pressure:
-      name: ${name} pressure
+      name: ${me} pressure
       id: bme280_pressure
       unit_of_measurement: "hPa"
 
     humidity:
-      name: ${name} relative humidity
+      name: ${me} relative humidity
       id: bme280_humidity
       unit_of_measurement: "%"
 
   - platform: template
-    name: ${name} temperature
-    lambda: return id(bme280_temperature).state * (9.0/5.0) + 32.0;
-    unit_of_measurement: °F
-
-  - platform: template
-    name: "${name} altitude"
+    name: ${me} altitude
     lambda: |-
       const float STANDARD_SEA_LEVEL_PRESSURE = 1013.25; //in hPa, see note
       return ((id(bme280_temperature).state + 273.15) / 0.0065) *
@@ -83,7 +83,7 @@ sensor:
     unit_of_measurement: 'm'
 
   - platform: template
-    name: ${name} absolute humidity
+    name: ${me} absolute humidity
     lambda: |-
       const float mw = 18.01534;    // molar mass of water g/mol
       const float r = 8.31447215;   // Universal gas constant J/mol/K
@@ -96,16 +96,10 @@ sensor:
     unit_of_measurement: 'g/m³'
 
   - platform: template
-    id: computed_dewpoint
+    name: ${me} dew point
     internal: true
     lambda: return (243.5*(log(id(bme280_humidity).state/100)+((17.67*id(bme280_temperature).state)/(243.5+id(bme280_temperature).state)))/(17.67-log(id(bme280_humidity).state/100)-((17.67*id(bme280_temperature).state)/(243.5+id(bme280_temperature).state))));
     unit_of_measurement: °C
-
-  - platform: template
-    name: ${name} dew point
-    lambda: return id(computed_dewpoint).state * (9.0/5.0) + 32.0;
-    unit_of_measurement: °F
-    icon: 'mdi:thermometer-alert'
 
 i2c:
   sda: D2
