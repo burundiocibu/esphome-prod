@@ -9,8 +9,8 @@ esphome:
   comment: Sonoff S31
 
 wifi:
-  ssid: !secret ssid2
-  password: !secret password2
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
 
 prometheus:
 
