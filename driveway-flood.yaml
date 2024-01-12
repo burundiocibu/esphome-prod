@@ -1,5 +1,6 @@
 substitutions:
   me: driveway-flood
+
 esphome:
   name: ${me}
   comment: Sonoff basic

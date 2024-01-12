@@ -1,9 +1,12 @@
 substitutions:
-  me: "water-meter"
+  me: water-meter
 
 esphome:
   name: ${me}
   comment: seeed xiao esp32c3
+  on_boot:
+    - lambda: |-
+        id(my_ota).set_auth_password("9f47a47302bb0eb644fa82fe1d75c67a");
 
 preferences:
   flash_write_interval: 5min
@@ -28,10 +31,11 @@ logger:
 
 api:
   encryption:
-    key: "SlhkErjfbCnikT6z6/u/jZ0TJytQy6ZLDdHeASL6t5o="
+    key: !secret esp_api_key
 
 ota:
   password: "a91c256e79428cf90c6eeeca7cd35fe8"
+  id: my_ota
 
 prometheus:
 
@@ -64,13 +68,13 @@ sensor:
     id: pulse_meter_id
     pin: 20
     unit_of_measurement: 'gpm'
-    name: ${me} Flow Rate
+    name: ${me} flow rate
     accuracy_decimals: 2
     timeout: 5s
     filters:
       - multiply: 0.008787
     total:
-      name: ${me} Usage
+      name: ${me} usage
       unit_of_measurement: "G"
       accuracy_decimals: 2
       filters:

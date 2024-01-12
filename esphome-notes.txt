@@ -56,3 +56,7 @@ To get the container to compile when run as a user, make sure the container defi
       HOME: /config
       PLATFORMIO_CORE_DIR: /config/.esphome/.platformio
       PLATFORMIO_GLOBALLIB_DIR: /config/.esphome/.plattformioLibs
+
+Then upload from the command line with:
+
+docker-compose exec esphome-prod esphome compile foo/dev.yaml

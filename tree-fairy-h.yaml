@@ -1,6 +1,9 @@
+substitutions:
+  me: tree-fairy-h
+
 esphome:
-  name: tree-fairy-h
-  friendly_name: tree-fairy-h
+  name: ${me}
+  comment: wemos d1 mini?
 
 esp8266:
   board: esp01_1m
@@ -14,10 +17,11 @@ logger:
 
 api:
   encryption:
-    key: "KbvNsCIsT9SzK7IkM2djuyinGaJweB4S4wiwwz8m25g="
+    key: !secret esp_api_key
 
 ota:
-  password: "e38da83369ec4201387f5760fb5c6718"
+  password: !secret esp_ota_pw
+  id: my_ota
 
 web_server:
   port: 80
@@ -26,15 +30,15 @@ prometheus:
 
 text_sensor:
   - platform: version
-    name: "ESPHome Version"
+    name: ${me} ESPHome Version
 
 switch:
   - platform: restart
-    name: Restart
+    name: ${me} restart
 
 sensor:
   - platform: uptime
-    name: Uptime
+    name: ${me} uptime
     update_interval: 120s
     
   - platform: wifi_signal
@@ -54,7 +58,7 @@ output:
 light:
   - platform: hbridge
     id: mainlight
-    name: "Tree Fairy H Light"
+    name: Tree Fairy H Light
     pin_a: pina
     pin_b: pinb
     
