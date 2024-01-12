@@ -45,3 +45,14 @@ api:
 ota:
   password: !secret esp_ota_pw
   id: my_ota
+
+
+----------
+1/11/2024:
+
+To get the container to compile when run as a user, make sure the container defines:
+
+    environment:
+      HOME: /config
+      PLATFORMIO_CORE_DIR: /config/.esphome/.platformio
+      PLATFORMIO_GLOBALLIB_DIR: /config/.esphome/.plattformioLibs

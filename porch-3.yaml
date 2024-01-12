@@ -59,7 +59,6 @@ sensor:
     temperature:
       name: ${me} temperature
       id: bme280_temperature
-      internal: true
       unit_of_measurement: °C
 
     pressure:
