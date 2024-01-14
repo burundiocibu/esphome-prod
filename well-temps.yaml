@@ -26,23 +26,29 @@
 #
 
 substitutions:
-  name: well-temps
+  me: well-temps
 
 esphome:
-  name: ${name}
-  platform: ESP32
+  name: ${me}
+  comment: tinyPico32
+
+esp32:
   board: tinypico
-  comment: "tinyPico32"
 
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
 
 logger:
+  level: debug
 
 api:
+  encryption:
+    key: !secret esp_api_key
 
 ota:
+  password: !secret esp_ota_pw
+  id: my_ota
 
 prometheus:
 
@@ -51,16 +57,15 @@ web_server:
 
 time:
   - platform: homeassistant
-    id: homeassistant_time
     timezone: America/Chicago
 
 text_sensor:
   - platform: version
-    name: "ESPHome Version"
+    name: ${me} ESPHome Version
 
 switch:
   - platform: restart
-    name: ${name} restart
+    name: ${me} restart
 
   - platform: gpio
     name: Pool hose
@@ -107,20 +112,18 @@ switch:
 
 sensor:
   - platform: uptime
-    name: ${name} uptime
+    name: ${me}  uptime
     update_interval: 120s
 
   - platform: wifi_signal
-    name: ${name} wifi signal
+    name: ${me}  wifi signal
     update_interval: 120s
 
   - platform: dallas
     address: 0xBF01193A06BCF028
     name: Well plumbing temperature
     accuracy_decimals: 2
-    filters:
-    - lambda: return x * (9.0/5.0) + 32.0;
-    unit_of_measurement: °F
+    unit_of_measurement: °C
 
   - platform: adc
     pin: GPIO32
@@ -168,7 +171,6 @@ sensor:
     # manually corrected G1 to make P match analog gauge at
     lambda: return 25 * (4.01*id(v_adc).state - 0.43);
     unit_of_measurement: "psi"
-
 
 dallas:
   - pin: GPIO27
