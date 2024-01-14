@@ -1,0 +1,94 @@
+# This is for a sonoff S31 power measuring socket (not the lite version)
+substitutions:
+  me: spare-sw1
+
+esphome:
+  name: ${me}
+  comment: Sonoff S31
+
+esp8266:
+  board: esp01_1m
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+web_server:
+  port: 80
+
+logger:
+  baud_rate: 0 # required for the cse7766 to work
+  level: info
+
+api:
+  encryption:
+    key: !secret esp_api_key
+
+ota:
+  password: !secret esp_ota_pw
+  id: my_ota
+
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: America/Chicago
+
+switch:
+  - platform: restart
+    name: ${me} restart
+
+  - platform: gpio
+    name: ${me} relay
+    pin: GPIO12
+    id: relay
+    icon: "mdi:power-socket-us"
+
+sensor:
+  - platform: uptime
+    name: ${me} uptime
+    update_interval: 120s
+    
+  - platform: wifi_signal
+    name: ${me} wifi signal
+    update_interval: 120s
+    
+  - platform: cse7766
+    current:
+      name: ${me} current
+      accuracy_decimals: 2
+      filters:
+        multiply: 0.951
+    voltage:
+      name: ${me} voltage
+      accuracy_decimals: 1
+    power:
+      name: ${me} power
+      id: power
+      accuracy_decimals: 0
+      filters:
+        multiply: 0.951
+    update_interval: 15s
+
+  - platform: total_daily_energy
+    name: ${me} daily energy
+    power_id: power
+    filters:
+      - multiply: 0.001
+    unit_of_measurement: kWh
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO0
+      mode: INPUT_PULLUP
+      inverted: True
+    name: ${me} button
+    on_press:
+      - switch.toggle: relay
+
+status_led:
+  pin: GPIO13
+
+uart:
+  rx_pin: RX
+  baud_rate: 4800
