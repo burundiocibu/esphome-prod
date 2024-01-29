@@ -17,7 +17,7 @@ home-prod:/config ghcr.io/esphome/esphome run --device $dev.groot-iot $dev.yaml^
 # To flash use esphome cli:
 # pip install wxesphomeflasher
 # esphomeflasher -p /dev/cu.usbserial-32230 --upload-baud-rate 115200 Downloads/noob8266.bin
-#  press and hold boot, presss and release reset, release boot
+#  press and hold boot, presss and release EN (reset), release boot
 #  while esphomeflasher is trying to connect to device
 
 ---------
