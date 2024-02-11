@@ -4,9 +4,6 @@ substitutions:
 esphome:
   name: ${me}
   comment: seeed xiao esp32c3
-  on_boot:
-    - lambda: |-
-        id(my_ota).set_auth_password("9f47a47302bb0eb644fa82fe1d75c67a");
 
 preferences:
   flash_write_interval: 5min
@@ -34,7 +31,7 @@ api:
     key: !secret esp_api_key
 
 ota:
-  password: "a91c256e79428cf90c6eeeca7cd35fe8"
+  password: !secret esp_ota_pw
   id: my_ota
 
 prometheus:
