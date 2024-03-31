@@ -61,13 +61,18 @@ sensor:
     current:
       name: ${me} current
       accuracy_decimals: 2
+      filters:
+        - throttle_average: 30s
     voltage:
       name: ${me} voltage
       accuracy_decimals: 1
+      filters:
+        - throttle_average: 30s
     power:
       name: ${me} power
       accuracy_decimals: 1
-    update_interval: 15s
+      filters:
+        - throttle_average: 30s
 
 binary_sensor:
   - platform: gpio

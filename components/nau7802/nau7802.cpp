@@ -8,20 +8,10 @@ namespace esphome {
 namespace nau7802 {
 
 static const char *const TAG = "nau7802";
-static const uint8_t NAU7802_REGISTER_CONVERSION = 0x00;
-static const uint8_t NAU7802_REGISTER_CONFIG = 0x01;
 
 void NAU7802Component::setup() {
-  ESP_LOGCONFIG(TAG, "Setting up NAU7802...");
-
-  i2c::I2CRegister rev = this->reg(NAU7802_DEVICE_REV);
-  if (rev.get() & 0x0f == 0)
-  {
-    this->mark_failed();
-    return;
-  }
-
   ESP_LOGCONFIG(TAG, "Configuring NAU7802...");
+  ESP_LOGD(TAG, "Configuring NAU7802...");
 
   // reset device
   i2c::I2CRegister pu_ctl = this->reg(NAU7802_PU_CTRL);
@@ -63,14 +53,15 @@ void NAU7802Component::dump_config() {
 }
 
 void NAU7802Component::update() {
-  i2c::I2CRegister adco = this->reg(NAU7802_ADCO_B2);
-  uint32_t v = adco.get() || (adco.get()<<8) || (adco.get()<<16);
-  if (v & 0x800000) v |= 0xFF000000;
+  uint8_t v[3];
+  read_register(NAU7802_ADCO_B2, v, 3);
+  if (v[2] & 0x80) v[2] |= 0xFF;
 
+  float vf = (v[0] | v[1] << 8 | v[2] << 16)/0x00ffffff;
   if (voltage_sensor_ != nullptr)
-    voltage_sensor_->publish_state(v);
+    voltage_sensor_->publish_state(vf);
   
-  ESP_LOGD(TAG, "%f V",v);
+  ESP_LOGD(TAG, "%f V",vf);
 }
 
 }  // namespace nau7802

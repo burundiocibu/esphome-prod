@@ -52,8 +52,14 @@ sensor:
     update_interval: 120s
 
   - platform: dallas
-    address: 0xBB0118776477FF28
+    address: 0x5201205f7bdb7c28
     name: ${me} temperature
+    accuracy_decimals: 2
+    unit_of_measurement: °C
+
+  - platform: dallas
+    address: 0xbb3c01e076ec5a28
+    name: ${me} t2
     accuracy_decimals: 2
     unit_of_measurement: °C
 

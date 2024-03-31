@@ -62,17 +62,20 @@ sensor:
       name: ${me} current
       accuracy_decimals: 2
       filters:
-        multiply: 0.951
+        - multiply: 0.951
+        - throttle_average: 30s
     voltage:
       name: ${me} voltage
       accuracy_decimals: 1
+      filters:
+        - throttle_average: 30s
     power:
       name: ${me} power
       id: power
       accuracy_decimals: 0
       filters:
-        multiply: 0.951
-    update_interval: 15s
+        - multiply: 0.951
+        - throttle_average: 30s
 
   - platform: total_daily_energy
     name: ${me} daily energy
