@@ -16,6 +16,8 @@ wifi:
 web_server:
   port: 80
 
+prometheus:
+
 logger:
   baud_rate: 0 # required for the cse7766 to work
   level: info

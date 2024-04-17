@@ -50,6 +50,7 @@ switch:
     name: ${me} restart
 
   - platform: gpio
+    # olla system
     name: ${me} valve 1
     icon: "mdi:valve"
     pin:
@@ -57,6 +58,7 @@ switch:
       inverted: yes
     
   - platform: gpio
+    # SE raised bed
     name: ${me} valve 2
     icon: "mdi:valve"
     pin:
@@ -64,6 +66,7 @@ switch:
       inverted: yes
 
   - platform: gpio
+    # SW raised bed 
     name: ${me} valve 3
     icon: "mdi:valve"
     pin:
@@ -71,6 +74,7 @@ switch:
       inverted: yes
 
   - platform: gpio
+    # S raised bed
     name: ${me} valve 4
     icon: "mdi:valve"
     pin:
