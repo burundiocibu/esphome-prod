@@ -1,7 +1,8 @@
 # wemos d1 mini w oled 0.66 shield (SSD1306 driver on I2C 0x3c)
 # 64x48 pixels across
 # i2c buttons at i2c 0x31
-# NAU7802 on I2C at 0x2a
+# HX711 interface to strain gauge
+
 substitutions:
   me: biltong-scale
 
@@ -62,12 +63,24 @@ sensor:
     name: ${me} wifi signal
     update_interval: 120s
 
-  - platform: nau7802
-    address: 0x2a
+  - platform: hx711
+    name: ${me} hx711 raw
+    id: hx711_raw
+    dout_pin: D5
+    clk_pin: D0
     gain: 128
-    voltage:
-      name: vb
-    update_interval: 1s
+    update_interval: 5s
+
+  - platform: template
+    name: ${me} weight
+    lambda: return id(hx711_raw).state;
+    filters:
+      - calibrate_linear:
+        - 128305 -> 0
+        - -183663 -> 100
+    unit_of_measuremenmt: g
+    update_interval: 5s
+
 
 font:
   - file: "gfonts://Ubuntu\ Mono"
