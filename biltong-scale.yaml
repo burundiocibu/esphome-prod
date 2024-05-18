@@ -18,7 +18,7 @@ wifi:
   password: !secret wifi_password
 
 logger:
-  level: debug
+  level: info
 
 api:
   encryption:
@@ -31,6 +31,17 @@ ota:
 prometheus:
 
 web_server:
+
+globals:
+  - id: tare_count
+    type: float
+    restore_value: yes
+    initial_value: "180000"
+
+  - id: cal100_count
+    type: float
+    restore_value: yes
+    initial_value: "500000"
 
 external_components:
   - source:
@@ -54,6 +65,13 @@ i2c:
   scl: D1
   frequency: 200kHz
 
+dallas:
+  pin:
+    number: D3
+    mode:
+      input: true
+      pullup: true
+
 sensor:
   - platform: uptime
     name: ${me} uptime
@@ -64,33 +82,67 @@ sensor:
     update_interval: 120s
 
   - platform: hx711
-    name: ${me} hx711 raw
     id: hx711_raw
     dout_pin: D5
     clk_pin: D0
     gain: 128
-    update_interval: 5s
+    update_interval: 200ms
+    filters:
+      - median:
+          window_size: 25
+          send_every: 25
+          send_first_at: 25
 
   - platform: template
     name: ${me} weight
-    lambda: return id(hx711_raw).state;
-    filters:
-      - calibrate_linear:
-        - 128305 -> 0
-        - -183663 -> 100
-    unit_of_measuremenmt: g
+    id: weight
+    # with above gain, about 3100 counts/gram
+    lambda: return 100 * (id(hx711_raw).state - id(tare_count)) / (id(cal100_count) - id(tare_count));
+    unit_of_measurement: g
+    accuracy_decimals: 2
     update_interval: 5s
 
+  - platform: template
+    name: ${me} tare_count
+    lambda: return id(tare_count);
+
+  - platform: template
+    name: ${me} cal100_count
+    lambda: return id(cal100_count);
+
+  - platform: dallas
+    address: 0xb302131afedcaa28
+    name: ${me} sg-temp
+    id: sg_temp
+    accuracy_decimals: 2
+    unit_of_measurement: °C
 
 font:
   - file: "gfonts://Ubuntu\ Mono"
     id: f1
-    size: 12
+    size: 16
 
 display:
   - platform: ssd1306_i2c
     model: "SSD1306 64x48"
     address: 0x3c
     lambda: |-
-      it.print(0,0,id(f1), "Hello");
-      it.print(0,12,id(f1), "World");
+      it.printf(0, 0, id(f1), "%.1f g", id(weight).state);
+      it.printf(0, 16, id(f1), "%.2f °C", id(sg_temp).state);
+
+button:
+  - platform: template
+    name: "Tare"
+    on_press:
+      - logger.log:
+          format: "setting tare_count to %.1f"
+          args: ['id(hx711_raw).state']
+      - lambda: 'id(tare_count) = id(hx711_raw).state;'
+  - platform: template
+    name: "100g Cal"
+    on_press:
+      - logger.log:
+          format: "setting cal100_count to %.1f"
+          args: ['id(hx711_raw).state']
+      - lambda: 'id(cal100_count) = id(hx711_raw).state;'
+

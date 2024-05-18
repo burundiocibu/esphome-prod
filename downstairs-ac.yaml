@@ -52,7 +52,7 @@ sensor:
 
   - platform: bme680
     address: 0x77
-    update_interval: 1s
+    update_interval: 5s
     temperature:
       name: ${me} return temperature
       id: t2
@@ -80,7 +80,7 @@ sensor:
 
   - platform: bme680
     address: 0x76
-    update_interval: 1s
+    update_interval: 5s
     temperature:
       name: ${me} evaporator temperature
       id: t1

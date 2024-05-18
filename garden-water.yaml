@@ -101,10 +101,10 @@ sensor:
       - multiply: 0.0005146200726141079 
     total:
       name: ${me} volume 1
-      unit_of_measurement: 'gal'
       accuracy_decimals: 2
       filters: 
         - multiply: 0.0005146200726141079
+      unit_of_measurement: 'gal'
 
   - platform: pulse_counter
     pin: 26 # was 12; bad idea
@@ -117,10 +117,10 @@ sensor:
       - multiply: 0.0005146200726141079 
     total:
       name: ${me} volume 2
-      unit_of_measurement: 'gal'
       accuracy_decimals: 2
       filters: 
         - multiply: 0.0005146200726141079
+      unit_of_measurement: 'gal'
 
   - platform: pulse_counter
     pin: 14
@@ -133,10 +133,10 @@ sensor:
       - multiply: 0.0005146200726141079 
     total:
       name: ${me} volume 3
-      unit_of_measurement: 'gal'
       accuracy_decimals: 2
       filters: 
         - multiply: 0.0005146200726141079
+      unit_of_measurement: 'gal'
 
   - platform: pulse_counter
     pin: 27
@@ -149,7 +149,7 @@ sensor:
       - multiply: 0.0005146200726141079 
     total:
       name: ${me} volume 4
-      unit_of_measurement: 'gal'
       accuracy_decimals: 2
       filters: 
         - multiply: 0.0005146200726141079
+      unit_of_measurement: 'gal'
