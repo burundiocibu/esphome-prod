@@ -69,22 +69,26 @@ sensor:
       accuracy_decimals: 2
       filters:
         - median
+        - offset: -0.2
     pressure:
       name: ${me} return pressure
       id: pr
       accuracy_decimals: 4
       filters:
         - median
+        - offset: 0.47
     humidity:
       name: ${me} return humidity
       id: hr
       accuracy_decimals: 1
       filters:
         - median
+        - offset: 2.1
 
   - platform: bme280_i2c
     address: 0x76
     update_interval: 5s
+    iir_filter: 16x
     i2c_id: bus_evaporator
     temperature:
       name: ${me} evaporator temperature
