@@ -1,21 +1,29 @@
-# hardware wemos d1-mini with a pair of bme680s on I2C
+# hardware esp32 with a pair of bme280s on I2C
 # SCL on D1(gpio5) brown wire, SDA on D2(gpio4) orange wire
 substitutions:
   me: downstairs-ac
 
 esphome:
   name: ${me}
-  comment: wemos d1 mini
+  comment: esp32 devkit
 
-esp8266:
-  board: d1_mini
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/bkaufx/esphome
+    components: [web_server_base]
 
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
 
 logger:
-  level: info
+  level: debug
 
 api:
   encryption:
@@ -50,119 +58,111 @@ sensor:
     name: ${me} wifi signal
     update_interval: 120s
 
-  - platform: bme680
-    address: 0x77
+  - platform: bme280_i2c
+    address: 0x76
     update_interval: 5s
+    iir_filter: 16x
+    i2c_id: bus_return
     temperature:
       name: ${me} return temperature
-      id: t2
+      id: tr
       accuracy_decimals: 2
       filters:
         - median
     pressure:
       name: ${me} return pressure
-      id: p2
+      id: pr
       accuracy_decimals: 4
       filters:
         - median
     humidity:
       name: ${me} return humidity
-      id: h2
-      accuracy_decimals: 1
-      filters:
-        - median
-    gas_resistance:
-      name: ${me} return gas resistance
-      id: g2
+      id: hr
       accuracy_decimals: 1
       filters:
         - median
 
-  - platform: bme680
+  - platform: bme280_i2c
     address: 0x76
     update_interval: 5s
+    i2c_id: bus_evaporator
     temperature:
       name: ${me} evaporator temperature
-      id: t1
+      id: te
       accuracy_decimals: 2
       filters:
         - median
     pressure:
       name: ${me} evaporator pressure
-      id: p1
+      id: pe
       accuracy_decimals: 4
       filters:
         - median
     humidity:
       name: ${me} evaporator humidity
-      id: h1
+      id: he
       accuracy_decimals: 1
-      filters:
-        - median
-    gas_resistance:
-      name: ${me} evaporator gas resistance
-      id: g1
       filters:
         - median
 
   - platform: template
+    name: ${me} return dewpoint
+    unit_of_measurement: °C
+    lambda: return (243.5*(log(id(hr).state/100)+((17.67*id(tr).state)/(243.5+id(tr).state)))/(17.67-log(id(hr).state/100)-((17.67*id(tr).state)/(243.5+id(tr).state))));
+    id: td1
+    accuracy_decimals: 1
+
+  - platform: template
+    name: ${me} evaporator dewpoint
+    unit_of_measurement: °C
+    lambda: return (243.5*(log(id(he).state/100)+((17.67*id(te).state)/(243.5+id(te).state)))/(17.67-log(id(he).state/100)-((17.67*id(te).state)/(243.5+id(te).state))));
+    id: td2
+    accuracy_decimals: 1
+
+  - platform: template
     name: ${me} Tr-Te
-    lambda: return id(t2).state - id(t1).state;
+    lambda: return id(tr).state - id(te).state;
     accuracy_decimals: 2
     unit_of_measurement: °C
 
   - platform: template
     name: ${me} Pr-Pe
-    lambda: return id(p2).state - id(p1).state;
+    lambda: return id(pr).state - id(pe).state;
     unit_of_measurement: hPa
     accuracy_decimals: 2
-
-  - platform: template
-    name: ${me} evaporator dewpoint
-    unit_of_measurement: °C
-    lambda: return (243.5*(log(id(h1).state/100)+((17.67*id(t1).state)/(243.5+id(t1).state)))/(17.67-log(id(h1).state/100)-((17.67*id(t1).state)/(243.5+id(t1).state))));
-    id: td1
-    accuracy_decimals: 1
-
-  - platform: template
-    name: ${me} return dewpoint
-    lambda: return (243.5*(log(id(h2).state/100)+((17.67*id(t2).state)/(243.5+id(t2).state)))/(17.67-log(id(h2).state/100)-((17.67*id(t2).state)/(243.5+id(t2).state))));
-    id: td2
-    accuracy_decimals: 1
-    unit_of_measurement: °C
-
-  - platform: template
-    name: ${me} TDr-TDe
-    lambda: return id(td2).state - id(td1).state;
-    unit_of_measurement: hPa
-    accuracy_decimals: 2
-
-  - platform: template
-    name: ${me} evaporator absolute humidity
-    lambda: |-
-      const float mw = 18.01534;    // molar mass of water g/mol
-      const float r = 8.31447215;   // Universal gas constant J/mol/K
-      return (6.112 * powf(2.718281828, (17.67 * id(t1).state) /
-        (id(t1).state + 243.5)) * id(p1).state * mw) /
-        ((273.15 + id(t1).state) * r); // in grams/m^3
-    accuracy_decimals: 2
-    update_interval: 15s
-    icon: 'mdi:water'
-    unit_of_measurement: 'g/m³'
 
   - platform: template
     name: ${me} return absolute humidity
     lambda: |-
       const float mw = 18.01534;    // molar mass of water g/mol
       const float r = 8.31447215;   // Universal gas constant J/mol/K
-      return (6.112 * powf(2.718281828, (17.67 * id(t2).state) /
-        (id(t2).state + 243.5)) * id(p2).state * mw) /
-        ((273.15 + id(t2).state) * r); // in grams/m^3
+      return (6.112 * powf(2.718281828, (17.67 * id(tr).state) /
+        (id(tr).state + 243.5)) * id(pr).state * mw) /
+        ((273.15 + id(tr).state) * r); // in grams/m^3
     accuracy_decimals: 2
     update_interval: 15s
     icon: 'mdi:water'
-    unit_of_measurement: 'g/m³'
+    unit_of_measurement: 'g/㎥'
+
+  - platform: template
+    name: ${me} evaporator absolute humidity
+    lambda: |-
+      const float mw = 18.01534;    // molar mass of water g/mol
+      const float r = 8.31447215;   // Universal gas constant J/mol/K
+      return (6.112 * powf(2.718281828, (17.67 * id(tr).state) /
+        (id(te).state + 243.5)) * id(pe).state * mw) /
+        ((273.15 + id(te).state) * r); // in grams/m^3
+    accuracy_decimals: 2
+    update_interval: 15s
+    icon: 'mdi:water'
+    unit_of_measurement: 'g/㎥'
 
 i2c:
-  sda: D2
-  scl: D1
+  - id: bus_evaporator
+    sda: 22 # brn
+    scl: 25 # ora
+    scan: true
+  - id: bus_return
+    sda: 21 # brn
+    scl: 32 # bnn
+    scan: true
