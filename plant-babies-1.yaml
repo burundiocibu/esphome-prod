@@ -18,7 +18,7 @@ web_server:
   port: 80
 
 logger:
-  level: debug
+  level: info
 
 api:
   encryption:
