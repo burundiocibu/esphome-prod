@@ -101,7 +101,7 @@ sensor:
       voltage:
         name: L2 voltage
         accuracy_decimals: 1
-        unit_of_measurement: "VAC"
+        unit_of_measurement: "V"
       gain_ct: 42600
       power:
         name: Wellhouse L2 power
@@ -154,7 +154,7 @@ sensor:
       voltage:
         name: L1 voltage
         accuracy_decimals: 1
-        unit_of_measurement: "VAC"
+        unit_of_measurement: "V"
       gain_ct: 40000
       power:
         name: Wellhouse L1 power
