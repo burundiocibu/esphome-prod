@@ -20,8 +20,9 @@ api:
     key: !secret esp_api_key
 
 ota:
-  password: !secret esp_ota_pw
-  id: my_ota
+  - platform: esphome
+    password: !secret esp_ota_pw
+    id: my_ota
 
 web_server:
   port: 80
