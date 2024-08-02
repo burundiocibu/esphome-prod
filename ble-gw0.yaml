@@ -1,0 +1,45 @@
+# hardware is an olimex esp32-gateway
+# https://www.olimex.com/Products/IoT/ESP32/ESP32-GATEWAY/open-source-hardware
+
+substitutions:
+  name: ble-gw0
+
+esphome:
+  name: ${name}
+  comment: olimex esp32-gateway 
+
+esp32:
+  board: esp32-gateway
+  framework:
+    type: esp-idf
+
+ethernet:
+  type: LAN8720
+  mdc_pin: GPIO23
+  mdio_pin: GPIO18
+  clk_mode: GPIO17_OUT
+  phy_addr: 0
+
+# openssl rand -base64 32
+api:
+  encryption:
+    key: "TDUqLDkhC9NjiONynxvkJxKpe0scFpEMHYcG2MHj8wQ="
+
+logger:
+
+ota:
+  password: "64324a7cfb0667085cd88b751836c378"
+
+esp32_ble_tracker:
+  scan_parameters:
+    interval: 1100ms
+    window: 1100ms
+    active: true
+
+bluetooth_proxy:
+  active: true
+
+button:
+- platform: safe_mode
+  name: Safe Mode Boot
+  entity_category: diagnostic

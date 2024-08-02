@@ -31,8 +31,9 @@ api:
     key: !secret esp_api_key
 
 ota:
-  password: !secret esp_ota_pw
-  id: my_ota
+  - platform: esphome
+    password: !secret esp_ota_pw
+    id: my_ota
 
 prometheus:
 
@@ -43,8 +44,9 @@ switch:
   - platform: restart
     name: ${me} restart
 
-dallas:
-  - pin: 8
+one_wire:
+  - platform: gpio
+    pin: 8
 
 sensor:
   - platform: uptime
@@ -80,13 +82,13 @@ sensor:
             //id(total_pulses) = 239016; // cumulative as of 10/8/2023
             return id(total_pulses);
 
-  - platform: dallas
+  - platform: dallas_temp
     address: 0x78000801edbbb610
     name: ${me} board temperature
     accuracy_decimals: 2
     unit_of_measurement: °C
 
-  - platform: dallas
+  - platform: dallas_temp
     address: 0x2c01187768f4ff28
     name: ${me} meter temperature
     accuracy_decimals: 2
