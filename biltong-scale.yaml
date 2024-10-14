@@ -66,12 +66,13 @@ i2c:
   scl: D1
   frequency: 200kHz
 
-dallas:
-  pin:
-    number: D3
-    mode:
-      input: true
-      pullup: true
+one_wire:
+  - platform: gpio
+    pin:
+      number: D3
+      mode:
+        input: true
+        pullup: true
 
 sensor:
   - platform: uptime
@@ -111,7 +112,7 @@ sensor:
     name: ${me} cal100_count
     lambda: return id(cal100_count);
 
-  - platform: dallas
+  - platform: dallas_temp
     address: 0xb302131afedcaa28
     name: ${me} sg-temp
     id: sg_temp

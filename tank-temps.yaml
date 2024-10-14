@@ -42,6 +42,10 @@ switch:
   - platform: restart
     name: ${me} restart
 
+one_wire:
+  - platform: gpio
+    pin: D3
+
 sensor:
   - platform: uptime
     name: ${me} uptime
@@ -51,33 +55,26 @@ sensor:
     name: ${me} wifi signal
     update_interval: 120s
 
-  - platform: dallas
+  - platform: dallas_temp
     address: 0x590119387D980028
     name: tank into ground
     accuracy_decimals: 2
     unit_of_measurement: °C
 
-  - platform: dallas
+  - platform: dallas_temp
     address: 0xC00119387D765A28
     name: tank ambient
     accuracy_decimals: 2
     unit_of_measurement: °C
 
-  - platform: dallas
+  - platform: dallas_temp
     address: 0x70011939F989F928
     name: tank pump head
     accuracy_decimals: 2
     unit_of_measurement: °C
 
-  - platform: dallas
+  - platform: dallas_temp
     address: 0xFB011939FFAF1328
     name: tank check valve
     accuracy_decimals: 2
     unit_of_measurement: °C
-
-dallas:
-  pin:
-    number: D3
-    mode:
-      input: true
-      pullup: true

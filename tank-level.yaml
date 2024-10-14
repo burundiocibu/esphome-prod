@@ -37,8 +37,9 @@ uart:
   rx_pin: D7
   baud_rate: 9600
 
-dallas:
-  - pin: D3
+one_wire:
+  - platform: gpio
+    pin: D3
 
 switch:
   - platform: restart
@@ -73,7 +74,7 @@ sensor:
     accuracy_decimals: 1
     unit_of_measurement: mm
 
-  - platform: dallas
+  - platform: dallas_temp
     address: 0xe203186bcbfaff28
     name: Rainwater tank water temperature
     accuracy_decimals: 2

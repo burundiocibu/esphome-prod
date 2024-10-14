@@ -1,5 +1,5 @@
 substitutions:
-  me: tree-fairies
+  me: deck-lights
   
 esphome:
   name: ${me}
@@ -11,6 +11,7 @@ esp8266:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  use_address: 192.168.2.160
 
 prometheus:
 
@@ -49,14 +50,46 @@ sensor:
   - platform: wifi_signal
     name: ${me} wifi signal
     update_interval: 120s
-    
+
 output:
+  - platform: esp8266_pwm
+    pin: GPIO4
+    frequency: 1000 Hz
+    id: pwm_w2
+    
+  - platform: esp8266_pwm
+    pin: GPIO12
+    frequency: 1000 Hz
+    id: pwm_b
+
+  - platform: esp8266_pwm
+    pin: GPIO13
+    frequency: 1000 Hz
+    id: pwm_g
+
+  - platform: esp8266_pwm
+    pin: GPIO14
+    frequency: 1000 Hz
+    id: pwm_w1
+
   - platform: esp8266_pwm
     pin: GPIO15
     frequency: 1000 Hz
-    id: pwm
-    
+    id: pwm_r
+
 light:
   - platform: monochromatic
-    name: Tree fairies
-    output: pwm
+    name: Lower Steps Lights
+    output: pwm_r
+
+  - platform: monochromatic
+    name: Upper Steps Lights
+    output: pwm_g
+
+  - platform: monochromatic
+    name: Entry Step Lights
+    output: pwm_b
+
+  - platform: monochromatic
+    name: Porch Steps Lights
+    output: pwm_w1

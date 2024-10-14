@@ -52,17 +52,18 @@ sensor:
     name: ${me} wifi signal
     update_interval: 120s
 
-  - platform: dallas
+  - platform: dallas_temp
     address: 0x5201205f7bdb7c28
     name: ${me} temperature
     accuracy_decimals: 2
     unit_of_measurement: °C
 
-  - platform: dallas
+  - platform: dallas_temp
     address: 0xbb3c01e076ec5a28
     name: ${me} t2
     accuracy_decimals: 2
     unit_of_measurement: °C
 
-dallas:
-  - pin: D3
+one_wire:
+  - platform: gpio
+    pin: D3

@@ -40,7 +40,7 @@ wifi:
   password: !secret wifi_password
 
 logger:
-  level: debug
+  level: info
 
 api:
   encryption:
@@ -120,7 +120,7 @@ sensor:
     name: ${me}  wifi signal
     update_interval: 120s
 
-  - platform: dallas
+  - platform: dallas_temp
     address: 0xBF01193A06BCF028
     name: Well plumbing temperature
     accuracy_decimals: 2
@@ -173,5 +173,6 @@ sensor:
     lambda: return 25 * (4.01*id(v_adc).state - 0.43);
     unit_of_measurement: "psi"
 
-dallas:
-  - pin: GPIO27
+one_wire:
+  - platform: gpio
+    pin: GPIO27
