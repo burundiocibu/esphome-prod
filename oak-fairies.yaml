@@ -50,19 +50,17 @@ sensor:
 
 light:
   - platform: esp32_rmt_led_strip
-    name: ${me} lights
+    name: ch1
     rgb_order: RGB
     chipset: WS2811
-    pin: GPIO2
-    num_leds: 333 
+    pin: GPIO1
+    num_leds: 332
     rmt_channel: 0
     effects:
       - addressable_rainbow:
-      - addressable_rainbow:
           name: Rainbow 10 333
           speed: 10
-          width: 500
-      - addressable_color_wipe:
+          width: 332
       - addressable_color_wipe:
           name: Color Wipe 1
           colors:
@@ -78,19 +76,98 @@ light:
           add_led_interval: 100ms
           reverse: false
       - addressable_scan:
+          name: Scan 10ms 50w
+          move_interval: 10ms
+          scan_width: 50
+      - addressable_twinkle:
+          name: Twinkle 40% 8ms
+          twinkle_probability: 50%
+          progress_interval: 8ms
+      - addressable_fireworks:
+          name: Fireworks 32ms 50%
+          update_interval: 32ms
+          spark_probability: 50%
+          use_random_color: true
+          fade_out_rate: 120
+
+  - platform: esp32_rmt_led_strip
+    name: ch2
+    rgb_order: RGB
+    chipset: WS2811
+    pin: GPIO2
+    num_leds: 332
+    rmt_channel: 1
+    effects:
+      - addressable_rainbow:
+          name: Rainbow 10 333
+          speed: 10
+          width: 332
+      - addressable_color_wipe:
+          name: Color Wipe 1
+          colors:
+            - red: 50%
+              green: 50%
+              blue: 50%
+              num_leds: 100
+              gradient: true
+            - red: 0%
+              green: 0%
+              blue: 0%
+              num_leds: 1
+          add_led_interval: 100ms
+          reverse: false
       - addressable_scan:
           name: Scan 10ms 50w
           move_interval: 10ms
           scan_width: 50
       - addressable_twinkle:
-      - addressable_twinkle:
-          name: Twinkle 50% 4ms
+          name: Twinkle 40% 8ms
           twinkle_probability: 50%
-          progress_interval: 4ms
-      - addressable_fireworks:
+          progress_interval: 8ms
       - addressable_fireworks:
           name: Fireworks 32ms 50%
           update_interval: 32ms
           spark_probability: 50%
-          use_random_color: false
+          use_random_color: true
+          fade_out_rate: 120
+
+  - platform: esp32_rmt_led_strip
+    name: ch3
+    rgb_order: RGB
+    chipset: WS2811
+    pin: GPIO3
+    num_leds: 318
+    rmt_channel: 2
+    effects:
+      - addressable_rainbow:
+          name: Rainbow 10 333
+          speed: 10
+          width: 318
+      - addressable_color_wipe:
+          name: Color Wipe 1
+          colors:
+            - red: 50%
+              green: 50%
+              blue: 50%
+              num_leds: 100
+              gradient: true
+            - red: 0%
+              green: 0%
+              blue: 0%
+              num_leds: 1
+          add_led_interval: 100ms
+          reverse: false
+      - addressable_scan:
+          name: Scan 10ms 50w
+          move_interval: 10ms
+          scan_width: 50
+      - addressable_twinkle:
+          name: Twinkle 40% 8ms
+          twinkle_probability: 50%
+          progress_interval: 8ms
+      - addressable_fireworks:
+          name: Fireworks 32ms 50%
+          update_interval: 32ms
+          spark_probability: 50%
+          use_random_color: true
           fade_out_rate: 120
