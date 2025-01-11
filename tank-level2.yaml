@@ -1,0 +1,96 @@
+substitutions:
+  me: tank-level2
+
+esphome:
+  name: ${me}
+  comment: tinys3
+
+esp32:
+  board: um_tinys3
+
+logger:
+  level: info
+
+api:
+  encryption:
+    key: !secret esp_api_key
+
+ota:
+  - platform: esphome
+    password: !secret esp_ota_pw
+    id: my_ota
+  
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+prometheus:
+
+web_server:
+  port: 80
+
+switch:
+  - platform: restart
+    name: ${me} restart
+
+one_wire:
+  - platform: gpio
+    pin:
+      number: GPIO4
+      mode:
+        input: true
+        pullup: true
+    
+
+i2c:
+  sda: GPIO5
+  scl: GPIO21
+  scan: true
+  id: bus_a
+
+ads1115:
+  - address: 0x48
+
+sensor:
+  - platform: uptime
+    name: ${me} uptime
+    update_interval: 120s
+    
+  - platform: wifi_signal
+    name: ${me} wifi signal
+    update_interval: 120s
+
+  - platform: ads1115
+    multiplexer: 'A0_GND'
+    gain: 4.096
+    name: ${me} throw-in-pressure
+    id: tip
+    unit_of_measurement: V
+    update_interval: 0.25s
+    filters:
+      - sliding_window_moving_average:
+          window_size: 240
+          send_every: 60
+
+  # Full is 2083mm (82")
+  - platform: template
+    name: ${me} water level
+    lambda: return id(tip).state;
+    unit_of_measurement: mm
+    filters:
+      - calibrate_linear:
+          method: least_squares
+          datapoints:
+            - 2.065 -> 1553 # from HRXL
+            - 1.964 -> 1504 # from HRXL
+            - 2.113 -> 1570 # 20241216 0000, from HRXL
+            - 1.792 -> 1417 # from HRXL
+            - 1.772 -> 1397 # from HRXL
+            - 1.929 -> 1489 # measured on mech gauge, 20250111
+
+
+  - platform: dallas_temp
+    address: 0x773c01d07583a328
+    name: Rainwater lower tank water temperature
+    accuracy_decimals: 2
+    unit_of_measurement: °C

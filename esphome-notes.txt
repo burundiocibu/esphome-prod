@@ -8,7 +8,7 @@ It appears that the olimex/ble gateways can't do prometheus with the idf
 from the containers dir:
 
 dev=back-tap-tapes; docker run -it -v ~/containers/esp
-home-prod:/config ghcr.io/esphome/esphome run --device $dev.groot-iot $dev.yaml^
+home-prod:/config ghcr.io/esphome/esphome run --device $dev.groot-iot $dev.yaml
 
 
 ---------

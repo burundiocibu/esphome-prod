@@ -55,6 +55,10 @@ one_wire:
   - platform: gpio
     pin: 8
 
+text_sensor:
+  - platform: version
+    name: ${me} ESPHome Version
+
 sensor:
   - platform: uptime
     name: ${me} uptime

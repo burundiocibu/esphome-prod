@@ -33,6 +33,10 @@ switch:
   - platform: restart
     name: ${me} restart
 
+text_sensor:
+  - platform: version
+    name: ${me} ESPHome Version
+
 sensor:
   - platform: uptime
     name: ${me} uptime
