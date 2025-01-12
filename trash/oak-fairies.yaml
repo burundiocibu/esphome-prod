@@ -1,0 +1,131 @@
+substitutions:
+  me: oak-fairies
+
+esphome:
+  name: ${me}
+  comment: seeed esp32s3 pico32
+
+esp32:
+  board: um_tinys3
+  framework:
+    type: arduino
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+logger:
+  level: info
+
+api:
+  encryption:
+    key: !secret esp_api_key
+
+ota:
+  - platform: esphome
+    password: !secret esp_ota_pw
+    id: my_ota
+
+web_server:
+  port: 80
+
+prometheus:
+
+text_sensor:
+  - platform: version
+    name: ${me} ESPHome Version
+
+switch:
+  - platform: restart
+    name: ${me} restart
+
+sensor:
+  - platform: uptime
+    name: ${me} uptime
+    update_interval: 120s
+    
+  - platform: wifi_signal
+    name: wifi signal
+    update_interval: 120s
+
+light:
+  - platform: esp32_rmt_led_strip
+    name: ${me} ch1
+    rgb_order: RGB
+    chipset: WS2811
+    pin: GPIO2
+    num_leds: 332
+    rmt_channel: 0
+    effects:
+      - addressable_rainbow:
+          name: Rainbow 10 333
+          speed: 10
+          width: 332
+      - addressable_scan:
+          name: Scan 10ms 50w
+          move_interval: 10ms
+          scan_width: 50
+      - addressable_twinkle:
+          name: Twinkle 40% 8ms
+          twinkle_probability: 50%
+          progress_interval: 8ms
+      - addressable_fireworks:
+          name: Fireworks 32ms 50%
+          update_interval: 32ms
+          spark_probability: 50%
+          use_random_color: true
+          fade_out_rate: 120
+
+  - platform: esp32_rmt_led_strip
+    name: ${me} ch2
+    rgb_order: RGB
+    chipset: WS2811
+    pin: GPIO3
+    num_leds: 332
+    rmt_channel: 1
+    effects:
+      - addressable_rainbow:
+          name: Rainbow 10 333
+          speed: 10
+          width: 332
+      - addressable_scan:
+          name: Scan 10ms 50w
+          move_interval: 10ms
+          scan_width: 50
+      - addressable_twinkle:
+          name: Twinkle 40% 8ms
+          twinkle_probability: 50%
+          progress_interval: 8ms
+      - addressable_fireworks:
+          name: Fireworks 32ms 50%
+          update_interval: 32ms
+          spark_probability: 50%
+          use_random_color: true
+          fade_out_rate: 120
+
+  - platform: esp32_rmt_led_strip
+    name: ${me} ch3
+    rgb_order: RGB
+    chipset: WS2811
+    pin: GPIO4
+    num_leds: 318
+    rmt_channel: 2
+    effects:
+      - addressable_rainbow:
+          name: Rainbow 10 333
+          speed: 10
+          width: 318
+      - addressable_scan:
+          name: Scan 10ms 50w
+          move_interval: 10ms
+          scan_width: 50
+      - addressable_twinkle:
+          name: Twinkle 40% 8ms
+          twinkle_probability: 50%
+          progress_interval: 8ms
+      - addressable_fireworks:
+          name: Fireworks 32ms 50%
+          update_interval: 32ms
+          spark_probability: 50%
+          use_random_color: true
+          fade_out_rate: 120

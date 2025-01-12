@@ -9,7 +9,7 @@ esp32:
   board: um_tinys3
 
 logger:
-  level: info
+  level: debug
 
 api:
   encryption:
@@ -81,12 +81,8 @@ sensor:
       - calibrate_linear:
           method: least_squares
           datapoints:
-            - 2.065 -> 1553 # from HRXL
-            - 1.964 -> 1504 # from HRXL
-            - 2.113 -> 1570 # 20241216 0000, from HRXL
-            - 1.792 -> 1417 # from HRXL
-            - 1.772 -> 1397 # from HRXL
-            - 1.929 -> 1489 # measured on mech gauge, 20250111
+            - -0.100 -> 0 # zero point 
+            - 3.040 -> 1489 # measured on mech gauge, 20250111
 
 
   - platform: dallas_temp
