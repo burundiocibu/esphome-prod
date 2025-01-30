@@ -9,7 +9,7 @@ esp32:
   board: um_tinys3
 
 logger:
-  level: debug
+  level: info
 
 api:
   encryption:
@@ -66,13 +66,14 @@ sensor:
     name: ${me} throw-in-pressure
     id: tip
     unit_of_measurement: V
-    update_interval: 0.25s
+    update_interval: 0.2s
     filters:
       - sliding_window_moving_average:
-          window_size: 240
-          send_every: 60
+          window_size: 600
+          send_every: 600
 
   # Full is 2083mm (82")
+  # Note that this cal is dependant on the gain/zero set on the 4-20mA -> V converter
   - platform: template
     name: ${me} water level
     lambda: return id(tip).state;
@@ -83,6 +84,7 @@ sensor:
           datapoints:
             - -0.100 -> 0 # zero point 
             - 3.040 -> 1489 # measured on mech gauge, 20250111
+            - 3.142 -> 1555 # 20250130, with stick on tape measure
 
 
   - platform: dallas_temp
