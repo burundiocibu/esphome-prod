@@ -13,9 +13,6 @@ preferences:
   flash_write_interval: 5min
 
 globals:
-  - id: garbage
-    type: double
-    restore_value: yes
   - id: usage
     type: double
     restore_value: yes
@@ -97,10 +94,7 @@ sensor:
     update_interval: 10s
     unit_of_measurement: "gal"
     lambda: |-
-      if (id(usage) != id(usage) || id(usage) < 260000)
-        id(usage) = 262144.0;
-      id(usage) += id(pmt).state;
-      id(pmt).state = 0;
+      id(usage) = id(pmt).state;
       return id(usage);
 
   - platform: dallas_temp

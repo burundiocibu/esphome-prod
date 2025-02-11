@@ -69,8 +69,8 @@ sensor:
     update_interval: 0.2s
     filters:
       - sliding_window_moving_average:
-          window_size: 600
-          send_every: 600
+          window_size: 900
+          send_every: 300
 
   # Full is 2083mm (82")
   # Note that this cal is dependant on the gain/zero set on the 4-20mA -> V converter
@@ -85,6 +85,7 @@ sensor:
             - -0.100 -> 0 # zero point 
             - 3.040 -> 1489 # measured on mech gauge, 20250111
             - 3.142 -> 1555 # 20250130, with stick on tape measure
+            - 3.915 -> 1904 # 20250211, stick on tape measure
 
 
   - platform: dallas_temp
