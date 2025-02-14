@@ -13,9 +13,10 @@ preferences:
   flash_write_interval: 5min
 
 globals:
-  - id: usage
+  - id: previous_usage
     type: double
-    restore_value: yes
+    restore_value: no
+    initial_value: '0'
 
 esp32:
   board: seeed_xiao_esp32c3
@@ -44,6 +45,22 @@ prometheus:
 web_server:
   port: 80
 
+mqtt:
+  broker: !secret mqtt_broker
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  id: mqtt_client
+  topic_prefix: ${me} 
+  on_json_message:
+    - topic: ${me}/usage
+      then:
+        - lambda: |-
+            if (x.containsKey("previous_usage") && id(previous_usage) == 0)
+            {
+              ESP_LOGI("mqtt", "received previous usage of %f", x["previous_usage"].as<double>());
+              id(previous_usage) = x["previous_usage"].as<double>() + id(current_usage).state;
+            }
+
 switch:
   - platform: restart
     name: ${me} restart
@@ -71,6 +88,11 @@ sensor:
           # every 15 seconds, send the updated result..
           send_every: 15
 
+  - platform: template
+    name: ${me} total usage
+    id: total_usage
+    unit_of_measurement: 'gal'
+
   - platform: pulse_meter
     pin: 20
     unit_of_measurement: 'gpm'
@@ -82,20 +104,21 @@ sensor:
       - multiply: 0.008787
     total:
       name: ${me} current usage
-      id: pmt
+      id: current_usage
       unit_of_measurement: 'gal'
       accuracy_decimals: 2
       filters:
         - multiply: 0.008787
+      on_value:
+        - sensor.template.publish:
+            id: total_usage
+            state: !lambda "return id(current_usage).state + id(previous_usage);"
+        - mqtt.publish_json:
+            topic: ${me}/usage
+            retain: true
+            payload: |-
+                root["previous_usage"] = id(total_usage).state;
 
-  - platform: template
-    name: ${me} temp usage
-    accuracy_decimals: 2
-    update_interval: 10s
-    unit_of_measurement: "gal"
-    lambda: |-
-      id(usage) = id(pmt).state;
-      return id(usage);
 
   - platform: dallas_temp
     address: 0x78000801edbbb610
