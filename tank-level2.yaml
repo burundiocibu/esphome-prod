@@ -83,11 +83,13 @@ sensor:
       - calibrate_linear:
           method: exact
           datapoints:
-            - -0.100 -> 0 # zero point 
-            - 3.040 -> 58.62 # measured on mech gauge, 20250111
-            - 3.142 -> 63.5 # 20250130, with stick on tape measure
-            - 3.912 -> 77.75 # 20250211, stick on tape measure
-            - 3.968 -> 80.00 # 20250212, ""
+            # with stick on tape measure unless otherwise noted
+            - -0.100 -> 0     # zero point 
+            - 3.040 -> 58.62  # measured on mech gauge, 20250111
+            - 3.142 -> 63.5   # 20250130
+            - 3.912 -> 77.75  # 20250211
+            - 3.927 -> 79.375 # 20250223 
+            - 3.968 -> 80.00  # 20250212
       - multiply: 25.4
 
 
