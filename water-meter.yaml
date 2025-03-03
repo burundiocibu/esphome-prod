@@ -7,7 +7,9 @@ esphome:
   on_boot:
     priority: -100.0
     then:
-      - logger.log: ${me} is connected!
+      - pulse_meter.set_total_pulses: 
+          id: pm
+          value: !lambda return id(previous_usage);
 
 preferences:
   flash_write_interval: 5min
@@ -15,8 +17,8 @@ preferences:
 globals:
   - id: previous_usage
     type: double
-    restore_value: no
-    initial_value: '0'
+    restore_value: true
+    initial_value: '104927' # 922 gal as of 3/3/2025
 
 esp32:
   board: seeed_xiao_esp32c3
@@ -29,7 +31,11 @@ logger:
   # The xiao esp32c3 seems to hang on reboot w/o a connected console
   # this seems to get around that. whatever
   baud_rate: 0
-  level: info
+  level: debug
+  logs:
+    sensor: info
+    mqtt: debug
+    wifi: info
 
 api:
   encryption:
@@ -51,15 +57,6 @@ mqtt:
   password: !secret mqtt_password
   id: mqtt_client
   topic_prefix: ${me} 
-  on_json_message:
-    - topic: ${me}/usage
-      then:
-        - lambda: |-
-            if (x.containsKey("previous_usage") && id(previous_usage) == 0)
-            {
-              ESP_LOGI("mqtt", "received previous usage of %f", x["previous_usage"].as<double>());
-              id(previous_usage) = x["previous_usage"].as<double>() + id(current_usage).state;
-            }
 
 switch:
   - platform: restart
@@ -89,9 +86,8 @@ sensor:
           send_every: 15
 
   - platform: template
-    name: ${me} total usage
-    id: total_usage
-    unit_of_measurement: 'gal'
+    name: ${me} previous_usage
+    lambda: !lambda return id(previous_usage);
 
   - platform: pulse_meter
     pin: 20
@@ -103,26 +99,22 @@ sensor:
     filters:
       - multiply: 0.008787
     total:
-      name: ${me} current usage
-      id: current_usage
+      name: ${me} total usage
+      id: total_usage
       unit_of_measurement: 'gal'
       accuracy_decimals: 2
       filters:
         - multiply: 0.008787
       on_value:
-        - sensor.template.publish:
-            id: total_usage
-            state: !lambda "return id(current_usage).state + id(previous_usage);"
-        - mqtt.publish_json:
-            topic: ${me}/usage
-            retain: true
-            payload: |-
-                root["previous_usage"] = id(total_usage).state;
-
+        then:
+          - globals.set: 
+              id: previous_usage
+              value: !lambda return id(total_usage).raw_state;
 
   - platform: dallas_temp
     address: 0x78000801edbbb610
     name: ${me} board temperature
+    id: t1
     accuracy_decimals: 2
     unit_of_measurement: °C
 
