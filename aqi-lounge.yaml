@@ -1,0 +1,138 @@
+substitutions:
+  me: "aqi-lounge"
+  meid: "lounge"
+
+esphome:
+  name: ${me}
+  comment: seeed esp32c3
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: arduino
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+logger:
+  level: debug
+
+api:
+  encryption:
+    key: !secret esp_api_key
+
+ota:
+  - platform: esphome
+    password: !secret esp_ota_pw
+    id: my_ota
+
+web_server:
+  port: 80
+
+prometheus:
+
+text_sensor:
+  - platform: version
+    name: ${me} ESPHome Version
+
+switch:
+  - platform: restart
+    name: ${me} restart
+
+i2c:
+  sda: GPIO6
+  scl: GPIO7
+  scan: true
+  id: co2bus
+
+sensor:
+  - platform: uptime
+    name: ${me} uptime
+    update_interval: 120s
+    
+  - platform: wifi_signal
+    name: wifi signal
+    update_interval: 120s
+
+  - platform: scd30
+    # https://sensirion.com/media/documents/4EAF6AF8/61652C3C/Sensirion_CO2_Sensors_SCD30_Datasheet.pdf
+    id: ${meid}_scd30
+    i2c_id: co2bus
+    temperature_offset: 0 °C
+    address: 0x61
+    update_interval: 5s
+    co2:
+      name: ${me} CO2
+      accuracy_decimals: 1
+      unit_of_measurement: ppm
+    temperature:
+      name: ${me} Temperature
+      accuracy_decimals: 2
+    humidity:
+      name: ${me} Humidity
+      accuracy_decimals: 1
+
+  - platform: sps30
+    # https://sensirion.com/media/documents/8600FF88/64A3B8D6/Sensirion_PM_Sensors_Datasheet_SPS30.pdf
+    id: ${meid}_sps30
+    address: 0x69
+    update_interval: 10s
+    pm_1_0:
+      name: ${me} PM <1µm Weight concentration
+      id: ${meid}_PM_1_0
+    pm_2_5:
+      name: ${me} PM <2.5µm Weight concentration
+      id: ${meid}_PM_2_5
+    pm_4_0:
+      name: ${me} PM <4µm Weight concentration
+      id: ${meid}_PM_4_0
+    pm_10_0:
+      name: ${me} PM <10µm Weight concentration
+      id: ${meid}_PM_10_0
+    pmc_0_5:
+      name: ${me} PM <0.5µm Number concentration
+      id: ${meid}_PMC_0_5
+    pmc_1_0:
+      name: ${me} PM <1µm Number concentration
+      id: ${meid}_PMC_1_0
+    pmc_2_5:
+      name: ${me} PM <2.5µm Number concentration
+      id: ${meid}_PMC_2_5
+    pmc_4_0:
+      name: ${me} PM <4µm Number concentration
+      id: ${meid}_PMC_4_0
+    pmc_10_0:
+      name: ${me} PM <10µm Number concentration
+      id: ${meid}_PMC_10_0
+    pm_size:
+      name: ${me} Typical Particle size
+      id: ${meid}_pm_size
+
+button:
+  - platform: template
+    name: ${me} SCD30 Force manual calibration
+    entity_category: "config"
+    on_press:
+      then:
+        - scd30.force_recalibration_with_reference:
+            value: !lambda 'return id(co2_cal).state;'
+
+  - platform: template
+    name: ${me} SPS30 Force fan clean
+    on_press:
+      then:
+        - sps30.start_fan_autoclean: ${meid}_sps30
+
+number:
+  - platform: template
+    name: ${me} CO2 calibration value
+    optimistic: true
+    min_value: 350
+    max_value: 4500
+    step: 1
+    id: co2_cal
+    icon: "mdi:molecule-co2"
+    entity_category: "config"
+    unit_of_measurement: ppm
+
