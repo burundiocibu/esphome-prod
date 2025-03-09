@@ -34,7 +34,6 @@ logger:
   level: debug
   logs:
     sensor: info
-    mqtt: debug
     wifi: info
 
 api:
@@ -50,13 +49,6 @@ prometheus:
 
 web_server:
   port: 80
-
-mqtt:
-  broker: !secret mqtt_broker
-  username: !secret mqtt_username
-  password: !secret mqtt_password
-  id: mqtt_client
-  topic_prefix: ${me} 
 
 switch:
   - platform: restart

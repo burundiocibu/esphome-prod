@@ -16,7 +16,7 @@ wifi:
   password: !secret wifi_password
 
 logger:
-  level: debug
+  level: info
 
 api:
   encryption:
@@ -57,15 +57,18 @@ sensor:
 
   - platform: scd30
     # https://sensirion.com/media/documents/4EAF6AF8/61652C3C/Sensirion_CO2_Sensors_SCD30_Datasheet.pdf
-    id: ${meid}_scd30
+    # https://sensirion.com/media/documents/33C09C07/620638B8/Sensirion_SCD30_Field_Calibration.pdf
     i2c_id: co2bus
     temperature_offset: 0 °C
     address: 0x61
-    update_interval: 5s
+    update_interval: 2s
     co2:
       name: ${me} CO2
       accuracy_decimals: 1
       unit_of_measurement: ppm
+      filters:
+        - filter_out:
+          - 0.0
     temperature:
       name: ${me} Temperature
       accuracy_decimals: 2
@@ -111,7 +114,7 @@ sensor:
 
 button:
   - platform: template
-    name: ${me} SCD30 Force manual calibration
+    name: ${me} Apply CO2 calibration value
     entity_category: "config"
     on_press:
       then:
@@ -120,6 +123,7 @@ button:
 
   - platform: template
     name: ${me} SPS30 Force fan clean
+    entity_category: "config"
     on_press:
       then:
         - sps30.start_fan_autoclean: ${meid}_sps30
