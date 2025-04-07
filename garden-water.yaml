@@ -1,13 +1,19 @@
-#esp32 wroom pin assignments
-#13: Rm1 - flow meter 1
-#12: Rm2 - flow meter 2
-#14: Rm3 - flow meter 3
-#27: Rm4 - flow meter 4
+# J1 pin assignments
+# 1 gnd
+# 2 +24 VDC
 
-#15: relay 1
-#2:  relay 2
-#4:  relay 3
-#16: relay 4
+# J1 pin assignments & wroom gpio assignments               
+# 1 gnd
+# 2 5VDC
+# 3 relay 1, gpio15
+# 4 flow meter 1, gpio13
+# 5 relay 2, gpio2
+# 6 flow meter 3, gpio14
+# 7 relay 3, gpio4
+# 8 flow meter 2, gpio12
+# 9 relay 4, gpio16
+# 10 flow meter 4, gpio27
+
 
 substitutions:
   me: garden-water
@@ -99,12 +105,12 @@ sensor:
     accuracy_decimals: 2
     filters:
       # 1928 pulses = 127 oz
-      - multiply: 0.0005146200726141079 
+      - multiply: 0.000631 
     total:
       name: ${me} volume 1
       accuracy_decimals: 2
       filters: 
-        - multiply: 0.0005146200726141079
+        - multiply: 0.000631
       unit_of_measurement: 'gal'
 
   - platform: pulse_counter
@@ -115,12 +121,12 @@ sensor:
     accuracy_decimals: 2
     filters:
       # 1928 pulses = 127 oz
-      - multiply: 0.0005146200726141079 
+      - multiply: 0.000631 
     total:
       name: ${me} volume 2
       accuracy_decimals: 2
       filters: 
-        - multiply: 0.0005146200726141079
+        - multiply: 0.000631
       unit_of_measurement: 'gal'
 
   - platform: pulse_counter
@@ -131,12 +137,12 @@ sensor:
     accuracy_decimals: 2
     filters:
       # 1928 pulses = 127 oz
-      - multiply: 0.0005146200726141079 
+      - multiply: 0.000631 
     total:
       name: ${me} volume 3
       accuracy_decimals: 2
       filters: 
-        - multiply: 0.0005146200726141079
+        - multiply: 0.000631
       unit_of_measurement: 'gal'
 
   - platform: pulse_counter
@@ -147,10 +153,10 @@ sensor:
     accuracy_decimals: 2
     filters:
       # 1928 pulses = 127 oz
-      - multiply: 0.0005146200726141079 
+      - multiply: 0.000631 
     total:
       name: ${me} volume 4
       accuracy_decimals: 2
       filters: 
-        - multiply: 0.0005146200726141079
+        - multiply: 0.000631
       unit_of_measurement: 'gal'

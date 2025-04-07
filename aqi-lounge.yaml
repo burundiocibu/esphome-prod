@@ -82,31 +82,31 @@ sensor:
     address: 0x69
     update_interval: 10s
     pm_1_0:
-      name: ${me} PM <1µm Weight concentration
+      name: ${me} PM <1µm µg/m³
       id: ${meid}_PM_1_0
     pm_2_5:
-      name: ${me} PM <2.5µm Weight concentration
+      name: ${me} PM <2.5µm µg/m³
       id: ${meid}_PM_2_5
     pm_4_0:
-      name: ${me} PM <4µm Weight concentration
+      name: ${me} PM <4µm µg/m³
       id: ${meid}_PM_4_0
     pm_10_0:
-      name: ${me} PM <10µm Weight concentration
+      name: ${me} PM <10µm µg/m³
       id: ${meid}_PM_10_0
     pmc_0_5:
-      name: ${me} PM <0.5µm Number concentration
+      name: ${me} PM <0.5µm #/cm³
       id: ${meid}_PMC_0_5
     pmc_1_0:
-      name: ${me} PM <1µm Number concentration
+      name: ${me} PM <1µm #/cm³
       id: ${meid}_PMC_1_0
     pmc_2_5:
-      name: ${me} PM <2.5µm Number concentration
+      name: ${me} PM <2.5µm #/cm³
       id: ${meid}_PMC_2_5
     pmc_4_0:
-      name: ${me} PM <4µm Number concentration
+      name: ${me} PM <4µm #/cm³
       id: ${meid}_PMC_4_0
     pmc_10_0:
-      name: ${me} PM <10µm Number concentration
+      name: ${me} PM <10µm #/cm³
       id: ${meid}_PMC_10_0
     pm_size:
       name: ${me} Typical Particle size
