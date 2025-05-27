@@ -9,7 +9,7 @@ esp32:
   board: um_tinys3
 
 logger:
-  level: debug
+  level: info
   logs:
     ads1115: info
 
@@ -28,6 +28,8 @@ wifi:
 
 web_server:
   port: 80
+
+prometheus:
 
 switch:
   - platform: restart

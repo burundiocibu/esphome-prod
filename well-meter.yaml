@@ -56,7 +56,7 @@ sensor:
     filters:
       - multiply: 0.000722 
     total:
-      name: ${me} volume
+      name: ${me} usage
       unit_of_measurement: 'gal'
       accuracy_decimals: 2
       filters: 
