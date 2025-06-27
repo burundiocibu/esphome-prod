@@ -1,0 +1,139 @@
+# Pool level sensor based upon a 240-33Ω Level sensor mounted on a skimmer lid
+# Processor is a esp32-c3 seeed studio xiao module
+# Vbat on the back of the board is connected to an 18650 LiIon cell
+# Vbuss is connected to a 5VDC solar cell
+# D0/A0/GPIO2 is connected to Vbat+ via a 100k/100k divider 
+
+# Deep sleep current, around 40uA
+# Awake current 30-80mA
+
+substitutions:
+  me: "pool-level"
+
+esphome:
+  name: ${me}
+  comment: seeed esp32c3
+  area: Pool
+
+esp32:
+  board: seeed_xiao_esp32c3
+  framework:
+    type: arduino
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  fast_connect: true
+  reboot_timeout: 60s
+  manual_ip: 
+    static_ip: 192.168.2.26
+    gateway: 192.168.2.1
+    subnet: 255.255.255.0
+    dns1: 192.168.2.1
+
+logger:
+  level: info
+
+ota:
+  - platform: esphome
+    password: !secret esp_ota_pw
+    id: my_ota
+
+globals:
+  - id: pub_count
+    type: int
+    restore_value: False
+    initial_value: "0"
+  - id: ota_mode
+    type: bool
+    restore_value: False
+    initial_value: "true"
+
+script:
+  - id: check_all_published
+    mode: restart
+    then:
+      - if:
+          condition:
+            lambda: 'return !id(ota_mode);'
+          then:
+            - lambda: |-
+                if (id(pub_count) == 0x7 && id(mqtt_client)->is_connected()) {
+                  id(sleeper).set_run_duration(0);
+                  id(sleeper).set_sleep_duration(1000 * 60 * 1); // 1 minutes
+                  id(sleeper).begin_sleep();
+                }
+
+mqtt:
+  broker: !secret mqtt_broker
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  id: mqtt_client
+  discovery: true
+  # Set these empty so the device is not marked missing by home assistant
+  will_message:
+  birth_message:
+  on_message:
+    - topic: ${me}/cmd/ota_mode
+      payload: 'ON'
+      then:
+        - deep_sleep.prevent: sleeper
+        - globals.set:
+            id: ota_mode
+            value: "true"
+        - logger.log:
+            format: "Sleep disabled"
+            level: info
+    - topic: ${me}/cmd/ota_mode
+      payload: 'OFF'
+      then:
+        - logger.log:
+            format: "Sleep enabled"
+            level: info
+        - globals.set:
+            id: ota_mode
+            value: "false"
+        - deep_sleep.enter: sleeper
+
+deep_sleep:
+  id: sleeper
+  run_duration: 60s
+  sleep_duration: 60s
+
+sensor:
+  - platform: wifi_signal
+    name: ${me} wifi signal
+    id: snr
+    update_interval: 1s
+    qos: 1
+    on_value:
+      then:
+        - lambda: 'id(pub_count) |= 0x1;'
+        - script.execute: check_all_published
+
+  - platform: internal_temperature
+    name: ${me} internal temperature
+    id: temp
+    update_interval: 1s
+    qos: 1
+    on_value:
+      then:
+        - lambda: 'id(pub_count) |= 0x2;'
+        - script.execute: check_all_published
+
+  - platform: adc
+    # aka D0, Has a 100k/100k resistive divider to Vbat
+    pin: GPIO2
+    name: ${me} vbat
+    id: vbat
+    attenuation: 12db # full scale is 4.2V
+    accuracy_decimals: 3
+    update_interval: 1s
+    qos: 1
+    filters:
+      - multiply: 2
+    on_value:
+      then:
+        - lambda: 'id(pub_count) |= 0x4;'
+        - script.execute: check_all_published
+
