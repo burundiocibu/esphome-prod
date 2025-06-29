@@ -14,6 +14,9 @@ esphome:
   name: ${me}
   comment: seeed esp32c3
   area: Pool
+  on_boot: 
+    then:
+      - deep_sleep.prevent: sleeper
 
 esp32:
   board: seeed_xiao_esp32c3
@@ -51,18 +54,25 @@ globals:
 
 script:
   - id: check_all_published
-    mode: restart
+    mode: queued
     then:
+      - logger.log:
+          format: "check_all_published %d, %d"
+          args: [ 'id(pub_count)', 'id(mqtt_client)->is_connected()']
+          level: info
       - if:
           condition:
-            lambda: 'return !id(ota_mode);'
+            lambda: 'return !id(ota_mode) && id(pub_count) == 0x7 && id(mqtt_client)->is_connected();'
           then:
-            - lambda: |-
-                if (id(pub_count) == 0x7 && id(mqtt_client)->is_connected()) {
-                  id(sleeper).set_run_duration(0);
-                  id(sleeper).set_sleep_duration(1000 * 60 * 1); // 1 minutes
-                  id(sleeper).begin_sleep();
-                }
+            - logger.log:
+                format: "all sent"
+                level: info
+            - delay: 1s
+            - globals.set:
+                id: pub_count
+                value: '0'
+            - deep_sleep.enter: sleeper
+              
 
 mqtt:
   broker: !secret mqtt_broker
@@ -97,7 +107,7 @@ mqtt:
 
 deep_sleep:
   id: sleeper
-  run_duration: 60s
+  run_duration: 15s
   sleep_duration: 60s
 
 sensor:
@@ -127,7 +137,7 @@ sensor:
     name: ${me} vbat
     id: vbat
     attenuation: 12db # full scale is 4.2V
-    accuracy_decimals: 3
+    accuracy_decimals: 2
     update_interval: 1s
     qos: 1
     filters:
