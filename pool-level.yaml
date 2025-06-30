@@ -4,6 +4,13 @@
 # Vbuss is connected to a 5VDC solar cell
 # D0/A0/GPIO2 is connected to Vbat+ via a 100k/100k divider 
 
+# VL53L0X ToF sensor on I2C
+# Red 3.3V
+# Shield Gnd
+# White SCL, GPIO7
+# Green SDA, GPIO6
+# Black XSHUT, GPIO21, Active low shutdown
+
 # Deep sleep current, around 40uA
 # Awake current 30-80mA
 
@@ -14,9 +21,13 @@ esphome:
   name: ${me}
   comment: seeed esp32c3
   area: Pool
-  on_boot: 
-    then:
-      - deep_sleep.prevent: sleeper
+  on_boot:
+    - priority: 200
+      then:
+        - globals.set:
+            id: pub_count
+            value: '0'
+
 
 esp32:
   board: seeed_xiao_esp32c3
@@ -35,7 +46,7 @@ wifi:
     dns1: 192.168.2.1
 
 logger:
-  level: info
+  level: INFO
 
 ota:
   - platform: esphome
@@ -51,28 +62,22 @@ globals:
     type: bool
     restore_value: False
     initial_value: "true"
+  - id: sleep_duration
+    type: long
+    initial_value: "30"
 
 script:
   - id: check_all_published
     mode: queued
     then:
-      - logger.log:
-          format: "check_all_published %d, %d"
-          args: [ 'id(pub_count)', 'id(mqtt_client)->is_connected()']
-          level: info
-      - if:
-          condition:
-            lambda: 'return !id(ota_mode) && id(pub_count) == 0x7 && id(mqtt_client)->is_connected();'
-          then:
-            - logger.log:
-                format: "all sent"
-                level: info
-            - delay: 1s
-            - globals.set:
-                id: pub_count
-                value: '0'
-            - deep_sleep.enter: sleeper
-              
+      - lambda: |-
+          if (!id(ota_mode) && sleep_duration > 0 && id(pub_count) == 0x7 && id(mqtt_client)->is_connected())
+          {
+            id(pub_count) = 0;
+            ESP_LOGI("main", "All sent. Sleeping for %d seconds.", id(sleep_duration));
+            id(sleeper).set_sleep_duration(id(sleep_duration) * 1000);
+            id(sleeper).begin_sleep(true);
+          }
 
 mqtt:
   broker: !secret mqtt_broker
@@ -83,6 +88,13 @@ mqtt:
   # Set these empty so the device is not marked missing by home assistant
   will_message:
   birth_message:
+  on_connect:
+    - mqtt.publish_json: 
+        topic: ${me}/jcl\
+        qos: 2
+        payload: |-
+          root["pub_count"] = id(pub_count);
+          root["msg"] = "on_connect";
   on_message:
     - topic: ${me}/cmd/ota_mode
       payload: 'ON'
@@ -92,23 +104,35 @@ mqtt:
             id: ota_mode
             value: "true"
         - logger.log:
-            format: "Sleep disabled"
+            format: "Rx ota_mode ON"
             level: info
     - topic: ${me}/cmd/ota_mode
       payload: 'OFF'
       then:
-        - logger.log:
-            format: "Sleep enabled"
-            level: info
         - globals.set:
             id: ota_mode
             value: "false"
-        - deep_sleep.enter: sleeper
+        - logger.log:
+            format: "Rx: ota_mode OFF"
+            level: info
+    - topic: ${me}/cmd/sleep_duration
+      payload: 'ON'
+      then:
+        - deep_sleep.prevent: sleeper
+        - globals.set:
+            id: ota_mode
+            value: "true"
+        - logger.log:
+            format: "Rx ota_mode ON"
+            level: info
 
 deep_sleep:
   id: sleeper
-  run_duration: 15s
   sleep_duration: 60s
+
+i2c:
+  sda: GPIO6
+  scl: GPIO7
 
 sensor:
   - platform: wifi_signal
@@ -147,3 +171,11 @@ sensor:
         - lambda: 'id(pub_count) |= 0x4;'
         - script.execute: check_all_published
 
+  - platform: vl53l0x
+    name: ${me} level
+    address: 0x29
+    update_interval: 1s
+    unit_of_measurement: "m"
+    accuracy_decimals: 4
+    long_range: false
+    enable_pin: GPIO21
