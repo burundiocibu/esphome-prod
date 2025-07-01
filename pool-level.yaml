@@ -22,12 +22,14 @@ esphome:
   comment: seeed esp32c3
   area: Pool
   on_boot:
-    - priority: 200
-      then:
-        - globals.set:
-            id: pub_count
-            value: '0'
-
+    - priority: -50
+      then:              
+        - mqtt.publish: 
+            topic: ${me}/status
+            qos: 1
+            payload: "online"
+        - lambda: |-
+            ESP_LOGI("main", "millis:%d, sleep_duration:%d, pub_count:%d", millis(), id(sleep_duration), id(pub_count));
 
 esp32:
   board: seeed_xiao_esp32c3
@@ -56,25 +58,20 @@ ota:
 globals:
   - id: pub_count
     type: int
-    restore_value: False
     initial_value: "0"
-  - id: ota_mode
-    type: bool
-    restore_value: False
-    initial_value: "true"
   - id: sleep_duration
     type: long
-    initial_value: "30"
+    initial_value: "66"
 
 script:
   - id: check_all_published
     mode: queued
     then:
       - lambda: |-
-          if (!id(ota_mode) && sleep_duration > 0 && id(pub_count) == 0x7 && id(mqtt_client)->is_connected())
+          if (id(sleep_duration) > 0 && id(pub_count) == 0xf && id(mqtt_client)->is_connected())
           {
             id(pub_count) = 0;
-            ESP_LOGI("main", "All sent. Sleeping for %d seconds.", id(sleep_duration));
+            ESP_LOGI("main", "All sent. millis:%d", millis());
             id(sleeper).set_sleep_duration(id(sleep_duration) * 1000);
             id(sleeper).begin_sleep(true);
           }
@@ -88,50 +85,26 @@ mqtt:
   # Set these empty so the device is not marked missing by home assistant
   will_message:
   birth_message:
-  on_connect:
-    - mqtt.publish_json: 
-        topic: ${me}/jcl\
-        qos: 2
-        payload: |-
-          root["pub_count"] = id(pub_count);
-          root["msg"] = "on_connect";
-  on_message:
-    - topic: ${me}/cmd/ota_mode
-      payload: 'ON'
-      then:
-        - deep_sleep.prevent: sleeper
-        - globals.set:
-            id: ota_mode
-            value: "true"
-        - logger.log:
-            format: "Rx ota_mode ON"
-            level: info
-    - topic: ${me}/cmd/ota_mode
-      payload: 'OFF'
-      then:
-        - globals.set:
-            id: ota_mode
-            value: "false"
-        - logger.log:
-            format: "Rx: ota_mode OFF"
-            level: info
   on_json_message: 
     topic: ${me}/cmd/set
     then:
       - globals.set:
           id: sleep_duration
           value: !lambda |-
-            long duration = 60;
+            long duration = id(sleep_duration);
             if (x.containsKey("sleep_duration"))
+            {
+              id(pub_count) |= 0x8;
               duration = long(x["sleep_duration"]);
-            if (duration == 0)
-              id(ota_mode) = true;
-            ESP_LOGI("main", "setting sleep_duration to %d seconds.", id(sleep_duration));
+              id(sleeper).prevent_deep_sleep();
+              ESP_LOGI("main", "Rx cmd/set, sleep_duration to %d seconds.", duration);
+            }
             return duration;
 
 deep_sleep:
   id: sleeper
-  sleep_duration: 60s
+  sleep_duration: 300s # Dummy value, should never be used
+  run_duration: 60s # Ditto. just for when there is no cmd/set msg to be had.
 
 i2c:
   sda: GPIO6
