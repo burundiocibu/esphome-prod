@@ -115,16 +115,19 @@ mqtt:
         - logger.log:
             format: "Rx: ota_mode OFF"
             level: info
-    - topic: ${me}/cmd/sleep_duration
-      payload: 'ON'
-      then:
-        - deep_sleep.prevent: sleeper
-        - globals.set:
-            id: ota_mode
-            value: "true"
-        - logger.log:
-            format: "Rx ota_mode ON"
-            level: info
+  on_json_message: 
+    topic: ${me}/cmd/set
+    then:
+      - globals.set:
+          id: sleep_duration
+          value: !lambda |-
+            long duration = 60;
+            if (x.containsKey("sleep_duration"))
+              duration = long(x["sleep_duration"]);
+            if (duration == 0)
+              id(ota_mode) = true;
+            ESP_LOGI("main", "setting sleep_duration to %d seconds.", id(sleep_duration));
+            return duration;
 
 deep_sleep:
   id: sleeper
