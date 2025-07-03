@@ -11,7 +11,7 @@
 # Green SDA, GPIO6
 # Black XSHUT, GPIO21, Active low shutdown
 
-# Deep sleep current, around 40uA
+# Deep sleep current, around 60uA with the level sensor connected
 # Awake current 30-80mA
 
 substitutions:
@@ -23,13 +23,13 @@ esphome:
   area: Pool
   on_boot:
     - priority: -50
-      then:              
+      then:
         - mqtt.publish: 
             topic: ${me}/status
             qos: 1
             payload: "online"
         - lambda: |-
-            ESP_LOGI("main", "millis:%d, sleep_duration:%d, pub_count:%d", millis(), id(sleep_duration), id(pub_count));
+            ESP_LOGI("boot", "millis:%d, sleep_duration:%d, pub_count:%0x", millis(), id(sleep_duration), id(pub_count));
 
 esp32:
   board: seeed_xiao_esp32c3
@@ -41,6 +41,7 @@ wifi:
   password: !secret wifi_password
   fast_connect: true
   reboot_timeout: 60s
+  id: wifi_id
   manual_ip: 
     static_ip: 192.168.2.26
     gateway: 192.168.2.1
@@ -68,11 +69,13 @@ script:
     mode: queued
     then:
       - lambda: |-
-          if (id(sleep_duration) > 0 && id(pub_count) == 0xf && id(mqtt_client)->is_connected())
+          if (id(sleep_duration) > 0 && id(pub_count) == 0x1f && id(mqtt_client)->is_connected())
           {
+            ESP_LOGI("check", "millis:%d, pub_count:%0x", millis(), id(pub_count));
             id(pub_count) = 0;
-            ESP_LOGI("main", "All sent. millis:%d", millis());
             id(sleeper).set_sleep_duration(id(sleep_duration) * 1000);
+            // manually controling 21 as opposed to using the enable_pin option didn't seem to work...
+            digitalWrite(21, LOW);
             id(sleeper).begin_sleep(true);
           }
 
@@ -85,6 +88,10 @@ mqtt:
   # Set these empty so the device is not marked missing by home assistant
   will_message:
   birth_message:
+  shutdown_message: 
+    topic: ${me}/status
+    payload: "offline"
+    qos: 1
   on_json_message: 
     topic: ${me}/cmd/set
     then:
@@ -133,15 +140,20 @@ sensor:
 
   - platform: adc
     # aka D0, Has a 100k/100k resistive divider to Vbat
+    # Also note that the battery voltage drops about .15 V when under the 80mA load
     pin: GPIO2
     name: ${me} vbat
     id: vbat
     attenuation: 12db # full scale is 4.2V
     accuracy_decimals: 2
-    update_interval: 1s
+    update_interval: 100ms
     qos: 1
     filters:
       - multiply: 2
+      - sliding_window_moving_average:
+          window_size: 10
+          send_every: 10
+          send_first_at: 10
     on_value:
       then:
         - lambda: 'id(pub_count) |= 0x4;'
@@ -150,8 +162,18 @@ sensor:
   - platform: vl53l0x
     name: ${me} level
     address: 0x29
-    update_interval: 1s
+    update_interval: 100ms
     unit_of_measurement: "m"
     accuracy_decimals: 4
     long_range: false
     enable_pin: GPIO21
+    qos: 1
+    filters:
+      - sliding_window_moving_average:
+          window_size: 10
+          send_every: 10
+          send_first_at: 10
+    on_value:
+      then:
+        - lambda: 'id(pub_count) |= 0x10;'
+        - script.execute: check_all_published
