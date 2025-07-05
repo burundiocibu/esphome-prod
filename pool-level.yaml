@@ -22,6 +22,10 @@ esphome:
   comment: seeed esp32c3
   area: Pool
   on_boot:
+    - priority: -800
+      then:
+        - lambda: |-
+            digitalWrite(9, HIGH);
     - priority: -50
       then:
         - mqtt.publish: 
@@ -75,7 +79,9 @@ script:
             id(pub_count) = 0;
             id(sleeper).set_sleep_duration(id(sleep_duration) * 1000);
             // manually controling 21 as opposed to using the enable_pin option didn't seem to work...
+            delay(250);
             digitalWrite(21, LOW);
+            digitalWrite(9, LOW);
             id(sleeper).begin_sleep(true);
           }
 
@@ -117,6 +123,10 @@ i2c:
   sda: GPIO6
   scl: GPIO7
 
+one_wire:
+  - platform: gpio
+    pin: GPIO10
+
 sensor:
   - platform: wifi_signal
     name: ${me} wifi signal
@@ -146,14 +156,10 @@ sensor:
     id: vbat
     attenuation: 12db # full scale is 4.2V
     accuracy_decimals: 2
-    update_interval: 100ms
+    update_interval: 800ms
     qos: 1
     filters:
       - multiply: 2
-      - sliding_window_moving_average:
-          window_size: 10
-          send_every: 10
-          send_first_at: 10
     on_value:
       then:
         - lambda: 'id(pub_count) |= 0x4;'
@@ -162,18 +168,21 @@ sensor:
   - platform: vl53l0x
     name: ${me} level
     address: 0x29
-    update_interval: 100ms
+    update_interval: 800ms
     unit_of_measurement: "m"
     accuracy_decimals: 4
     long_range: false
+    timing_budget: 200ms
     enable_pin: GPIO21
     qos: 1
-    filters:
-      - sliding_window_moving_average:
-          window_size: 10
-          send_every: 10
-          send_first_at: 10
     on_value:
       then:
         - lambda: 'id(pub_count) |= 0x10;'
         - script.execute: check_all_published
+
+  - platform: dallas_temp
+    address: 0xd63c01d075a4ef28
+    name: ${me} water temperature
+    accuracy_decimals: 2
+    update_interval: 800ms
+    unit_of_measurement: °C

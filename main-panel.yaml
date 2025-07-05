@@ -77,6 +77,18 @@ text_sensor:
   - platform: version
     name: ${me} ESPHome Version
 
+  - platform: atm90e32
+    id: brd1
+    phase_status:
+      phase_a:
+        name: "Phase A Status"
+      phase_b:
+        name: "Phase B Status"
+      phase_c:
+        name: "Phase C Status"
+    frequency_status:
+      name: "Frequency Status"
+
 switch:
   - platform: restart
     name: ${me} restart
@@ -90,9 +102,12 @@ sensor:
     name: ${me} wifi signal
     update_interval: 120s
 
+
+
   #==============================================
   # board #1, IC 1
   - platform: atm90e32
+    id: brd1
     cs_pin: 5
     chip_temperature:
       name: temperature
