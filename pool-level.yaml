@@ -26,6 +26,7 @@ esphome:
       then:
         - lambda: |-
             digitalWrite(9, HIGH);
+            digitalWrite(21, HIGH);
     - priority: -50
       then:
         - mqtt.publish: 
@@ -67,19 +68,20 @@ globals:
   - id: sleep_duration
     type: long
     initial_value: "66"
+  - id: vcount
+    type: int
+    initial_value: "0"
 
 script:
   - id: check_all_published
     mode: queued
     then:
       - lambda: |-
-          if (id(sleep_duration) > 0 && id(pub_count) == 0x1f && id(mqtt_client)->is_connected())
+          if (id(sleep_duration) > 0 && id(pub_count) == 0x1f)
           {
-            ESP_LOGI("check", "millis:%d, pub_count:%0x", millis(), id(pub_count));
+            ESP_LOGI("check", "millis:%d, pub_count:%0x, vcount:%d", millis(), id(pub_count), id(vcount));
             id(pub_count) = 0;
             id(sleeper).set_sleep_duration(id(sleep_duration) * 1000);
-            // manually controling 21 as opposed to using the enable_pin option didn't seem to work...
-            delay(250);
             digitalWrite(21, LOW);
             digitalWrite(9, LOW);
             id(sleeper).begin_sleep(true);
@@ -110,7 +112,7 @@ mqtt:
               id(pub_count) |= 0x8;
               duration = long(x["sleep_duration"]);
               id(sleeper).prevent_deep_sleep();
-              ESP_LOGI("main", "Rx cmd/set, sleep_duration to %d seconds.", duration);
+              ESP_LOGI("main", "sleep_duration set to %d seconds.", duration);
             }
             return duration;
 
@@ -156,7 +158,7 @@ sensor:
     id: vbat
     attenuation: 12db # full scale is 4.2V
     accuracy_decimals: 2
-    update_interval: 800ms
+    update_interval: 1s
     qos: 1
     filters:
       - multiply: 2
@@ -168,21 +170,20 @@ sensor:
   - platform: vl53l0x
     name: ${me} level
     address: 0x29
-    update_interval: 800ms
+    update_interval: 1s
     unit_of_measurement: "m"
-    accuracy_decimals: 4
+    accuracy_decimals: 3
     long_range: false
-    timing_budget: 200ms
-    enable_pin: GPIO21
+    timing_budget: 500ms
     qos: 1
     on_value:
       then:
-        - lambda: 'id(pub_count) |= 0x10;'
+        - lambda: 'id(pub_count) |= 0x10; id(vcount) += 1;'
         - script.execute: check_all_published
 
   - platform: dallas_temp
     address: 0xd63c01d075a4ef28
     name: ${me} water temperature
     accuracy_decimals: 2
-    update_interval: 800ms
+    update_interval: 1s
     unit_of_measurement: °C
