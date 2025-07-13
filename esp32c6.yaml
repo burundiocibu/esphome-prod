@@ -1,0 +1,74 @@
+substitutions:
+  me: "esp32c6"
+
+esphome:
+  name: ${me}
+  comment: sparkfun esp32c3
+
+esp32:
+  board: sparkfun_esp32c6_thing_plus
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://burundiocibu/c6_adc
+# Enable logging
+logger:
+  level: INFO
+
+api:
+  encryption:
+    key: !secret esp_api_key
+
+ota:
+  - platform: esphome
+    password: !secret esp_ota_pw
+    id: my_ota
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  power_save_mode: HIGH
+  
+web_server:
+
+#deep_sleep:
+#  id: sleeper
+#  sleep_duration: 120s
+#  run_duration: 30s
+
+text_sensor:
+  - platform: version
+    name: ${me} ESPHome Version
+
+switch:
+  - platform: restart
+    name: ${me} restart
+
+output:
+  - platform: gpio
+    pin: 23
+    id: status_led
+    
+
+sensor:
+  - platform: wifi_signal
+    name: ${me} wifi signal
+    id: snr
+    update_interval: 15s
+
+  - platform: internal_temperature
+    name: ${me} internal temperature
+    id: temp
+    update_interval: 15s
+
+  - platform: c6_adc
+    pin: GPIO1
+    name: ${me} vbat
+    id: vbat
+    attenuation: 12db # full scale is 2.450V
+    accuracy_decimals: 2
+    update_interval: 15s
+    filters:
+      - multiply: 2
+ 

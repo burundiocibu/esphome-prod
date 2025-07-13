@@ -1,0 +1,35 @@
+esphome:
+  name: esp32s3
+  friendly_name: esp32s3
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "Gs+1DAcGmbihvLIckFzJMsyktRm7j37RyN+evSbVcNA="
+
+ota:
+  - platform: esphome
+    password: "9507c121bead8589bc4b5b4450aa24f9"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Esp32S3 Fallback Hotspot"
+    password: "iAZdvq69srVU"
+
+captive_portal:
+
+web_server:
+  
+    
