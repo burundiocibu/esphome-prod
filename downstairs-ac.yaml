@@ -12,12 +12,6 @@ esp32:
   framework:
     type: arduino
 
-external_components:
-  - source:
-      type: git
-      url: https://github.com/bkaufx/esphome
-    components: [web_server_base]
-
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password

@@ -170,7 +170,7 @@ sensor:
   - platform: vl53l0x
     name: ${me} level
     address: 0x29
-    update_interval: 1s
+    update_interval: 5s
     unit_of_measurement: "m"
     accuracy_decimals: 3
     long_range: false

@@ -7,6 +7,8 @@ esphome:
 
 esp32:
   board: esp32dev
+  framework:
+    type: esp-idf
     
 wifi:
   ssid: !secret wifi_ssid

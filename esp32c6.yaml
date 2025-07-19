@@ -4,6 +4,10 @@ substitutions:
 esphome:
   name: ${me}
   comment: sparkfun esp32c3
+  on_boot: 
+    - priority: 0
+      then:
+        - deep_sleep.prevent: sleeper
 
 esp32:
   board: sparkfun_esp32c6_thing_plus
@@ -12,13 +16,16 @@ esp32:
 
 external_components:
   - source: github://burundiocibu/c6_adc
-# Enable logging
+
 logger:
-  level: INFO
+  level: DEBUG
+  logs:
+    sensor: ERROR
 
 api:
   encryption:
     key: !secret esp_api_key
+  batch_delay: 0ms
 
 ota:
   - platform: esphome
@@ -28,14 +35,42 @@ ota:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-  power_save_mode: HIGH
-  
-web_server:
+  fast_connect: true
+  reboot_timeout: 60s
+  id: wifi_id
+  manual_ip: 
+    static_ip: 192.168.2.197
+    gateway: 192.168.2.1
+    subnet: 255.255.255.0
+    dns1: 192.168.2.1
 
-#deep_sleep:
-#  id: sleeper
-#  sleep_duration: 120s
-#  run_duration: 30s
+web_server:
+  version: 2
+
+deep_sleep:
+  id: sleeper
+  sleep_duration: 60s
+  run_duration: 15s
+
+globals:
+  - id: pub_count
+    type: int
+    initial_value: "0"
+
+script:
+  - id: bedtime
+    mode: queued
+    then:
+      - delay: 50ms
+      - lambda: |-
+          ESP_LOGD("bedtime", "millis:%d, pub_count:%0x, sleep_duration:%f", millis(), id(pub_count), id(sleep_duration).state);
+          bool connected = ! std::isnan(id(sleep_duration).state);
+          if (id(pub_count) == 0x7 && id(sleep_duration).state > 0 && connected)
+          {
+            id(pub_count) = 0;
+            id(sleeper).set_sleep_duration(id(sleep_duration).state * 1000);
+            id(sleeper).begin_sleep(true);
+          }
 
 text_sensor:
   - platform: version
@@ -49,18 +84,35 @@ output:
   - platform: gpio
     pin: 23
     id: status_led
-    
 
 sensor:
   - platform: wifi_signal
     name: ${me} wifi signal
     id: snr
-    update_interval: 15s
+    update_interval: 5s
+    on_value:
+      then:
+        - lambda: 'id(pub_count) |= 0x1;'
+        - script.execute: bedtime
+
+  - platform: homeassistant
+    entity_id: input_select.sleep_duration_2
+    id: sleep_duration
 
   - platform: internal_temperature
     name: ${me} internal temperature
     id: temp
-    update_interval: 15s
+    update_interval: 500ms
+    filters:
+      - multiply: 2
+      - sliding_window_moving_average:
+          window_size: 10
+          send_every: 10
+          send_first_at: 10
+    on_value:
+      then:
+        - lambda: 'id(pub_count) |= 0x2;'
+        - script.execute: bedtime
 
   - platform: c6_adc
     pin: GPIO1
@@ -68,7 +120,14 @@ sensor:
     id: vbat
     attenuation: 12db # full scale is 2.450V
     accuracy_decimals: 2
-    update_interval: 15s
+    update_interval: 500ms
     filters:
       - multiply: 2
- 
+      - sliding_window_moving_average:
+          window_size: 10
+          send_every: 10
+          send_first_at: 10
+    on_value:
+      then:
+        - lambda: 'id(pub_count) |= 0x4;'
+        - script.execute: bedtime
