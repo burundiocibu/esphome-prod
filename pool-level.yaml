@@ -22,24 +22,19 @@ esphome:
   comment: seeed esp32c3
   area: Pool
   on_boot:
-    - priority: -800
+#    - priority: -800
+#      then:
+#        - lambda: |-
+#            digitalWrite(9, HIGH);
+#            digitalWrite(21, HIGH);
+    - priority: 0
       then:
-        - lambda: |-
-            digitalWrite(9, HIGH);
-            digitalWrite(21, HIGH);
-    - priority: -50
-      then:
-        - mqtt.publish: 
-            topic: ${me}/status
-            qos: 1
-            payload: "online"
-        - lambda: |-
-            ESP_LOGI("boot", "millis:%d, sleep_duration:%d, pub_count:%0x", millis(), id(sleep_duration), id(pub_count));
+        - deep_sleep.prevent: sleeper
 
 esp32:
   board: seeed_xiao_esp32c3
   framework:
-    type: arduino
+    type: esp-idf
 
 wifi:
   ssid: !secret wifi_ssid
@@ -53,73 +48,58 @@ wifi:
     subnet: 255.255.255.0
     dns1: 192.168.2.1
 
+web_server:
+  version: 2
+
 logger:
-  level: INFO
+  level: DEBUG
+  logs:
+    sensor: ERROR
+    dallas.temp.sensor: ERROR
+    vl53l0x: WARN
+
+api:
+  encryption:
+    key: !secret esp_api_key
+  batch_delay: 0ms
 
 ota:
   - platform: esphome
     password: !secret esp_ota_pw
     id: my_ota
 
-globals:
-  - id: pub_count
-    type: int
-    initial_value: "0"
-  - id: sleep_duration
-    type: long
-    initial_value: "66"
-  - id: vcount
-    type: int
-    initial_value: "0"
-
-script:
-  - id: check_all_published
-    mode: queued
-    then:
-      - lambda: |-
-          if (id(sleep_duration) > 0 && id(pub_count) == 0x1f)
-          {
-            ESP_LOGI("check", "millis:%d, pub_count:%0x, vcount:%d", millis(), id(pub_count), id(vcount));
-            id(pub_count) = 0;
-            id(sleeper).set_sleep_duration(id(sleep_duration) * 1000);
-            digitalWrite(21, LOW);
-            digitalWrite(9, LOW);
-            id(sleeper).begin_sleep(true);
-          }
-
-mqtt:
-  broker: !secret mqtt_broker
-  username: !secret mqtt_username
-  password: !secret mqtt_password
-  id: mqtt_client
-  discovery: true
-  # Set these empty so the device is not marked missing by home assistant
-  will_message:
-  birth_message:
-  shutdown_message: 
-    topic: ${me}/status
-    payload: "offline"
-    qos: 1
-  on_json_message: 
-    topic: ${me}/cmd/set
-    then:
-      - globals.set:
-          id: sleep_duration
-          value: !lambda |-
-            long duration = id(sleep_duration);
-            if (x.containsKey("sleep_duration"))
-            {
-              id(pub_count) |= 0x8;
-              duration = long(x["sleep_duration"]);
-              id(sleeper).prevent_deep_sleep();
-              ESP_LOGI("main", "sleep_duration set to %d seconds.", duration);
-            }
-            return duration;
-
 deep_sleep:
   id: sleeper
   sleep_duration: 300s # Dummy value, should never be used
   run_duration: 60s # Ditto. just for when there is no cmd/set msg to be had.
+
+globals:
+  - id: pub_count
+    type: int
+    initial_value: "0"
+
+script:
+  - id: bedtime
+    mode: queued
+    then:
+      - delay: 50ms
+      - lambda: |-
+          ESP_LOGD("bedtime", "millis:%d, pub_count:%0x, sleep_duration:%f", millis(), id(pub_count), id(sleep_duration).state);
+          bool connected = ! std::isnan(id(sleep_duration).state);
+          if (id(pub_count) == 0xf && id(sleep_duration).state > 0 && connected)
+          {
+            id(pub_count) = 0;
+            id(sleeper).set_sleep_duration(id(sleep_duration).state * 1000);
+            id(sleeper).begin_sleep(true);
+          }
+
+text_sensor:
+  - platform: version
+    name: ${me} ESPHome Version
+
+switch:
+  - platform: restart
+    name: ${me} restart
 
 i2c:
   sda: GPIO6
@@ -133,22 +113,30 @@ sensor:
   - platform: wifi_signal
     name: ${me} wifi signal
     id: snr
-    update_interval: 1s
-    qos: 1
+    update_interval: 5s
     on_value:
       then:
         - lambda: 'id(pub_count) |= 0x1;'
-        - script.execute: check_all_published
+        - script.execute: bedtime
+
+  - platform: homeassistant
+    entity_id: input_select.sleep_duration
+    id: sleep_duration
 
   - platform: internal_temperature
     name: ${me} internal temperature
     id: temp
-    update_interval: 1s
-    qos: 1
+    update_interval: 500ms
+    filters:
+      - filter_out: NAN
+      - sliding_window_moving_average:
+          window_size: 10
+          send_every: 10
+          send_first_at: 10
     on_value:
       then:
         - lambda: 'id(pub_count) |= 0x2;'
-        - script.execute: check_all_published
+        - script.execute: bedtime
 
   - platform: adc
     # aka D0, Has a 100k/100k resistive divider to Vbat
@@ -158,32 +146,45 @@ sensor:
     id: vbat
     attenuation: 12db # full scale is 4.2V
     accuracy_decimals: 2
-    update_interval: 1s
-    qos: 1
+    update_interval: 500ms
     filters:
       - multiply: 2
+      - sliding_window_moving_average:
+          window_size: 10
+          send_every: 10
+          send_first_at: 10
+      - filter_out: NAN
     on_value:
       then:
         - lambda: 'id(pub_count) |= 0x4;'
-        - script.execute: check_all_published
+        - script.execute: bedtime
 
   - platform: vl53l0x
     name: ${me} level
     address: 0x29
-    update_interval: 5s
+    update_interval: 400ms
     unit_of_measurement: "m"
-    accuracy_decimals: 3
+    accuracy_decimals: 4
     long_range: false
-    timing_budget: 500ms
-    qos: 1
+    timing_budget: 300ms
+    enable_pin: 21
+    signal_rate_limit: 50
+    filters:
+       - sliding_window_moving_average:
+          window_size: 10
+          send_every: 10
+          send_first_at: 10
+       - filter_out: NAN
     on_value:
       then:
-        - lambda: 'id(pub_count) |= 0x10; id(vcount) += 1;'
-        - script.execute: check_all_published
+        - lambda: 'id(pub_count) |= 0x8;'
+        - script.execute: bedtime
 
   - platform: dallas_temp
     address: 0xd63c01d075a4ef28
     name: ${me} water temperature
     accuracy_decimals: 2
-    update_interval: 1s
+    update_interval: 5s
     unit_of_measurement: °C
+    filters:
+      - filter_out: NAN
