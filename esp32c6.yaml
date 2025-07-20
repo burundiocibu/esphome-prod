@@ -63,7 +63,7 @@ script:
     then:
       - delay: 50ms
       - lambda: |-
-          ESP_LOGD("bedtime", "millis:%d, pub_count:%0x, sleep_duration:%f", millis(), id(pub_count), id(sleep_duration).state);
+          ESP_LOGV("bedtime", "millis:%d, pub_count:%0x, sleep_duration:%f", millis(), id(pub_count), id(sleep_duration).state);
           bool connected = ! std::isnan(id(sleep_duration).state);
           if (id(pub_count) == 0x7 && id(sleep_duration).state > 0 && connected)
           {
@@ -89,7 +89,7 @@ sensor:
   - platform: wifi_signal
     name: ${me} wifi signal
     id: snr
-    update_interval: 5s
+    update_interval: 1s
     on_value:
       then:
         - lambda: 'id(pub_count) |= 0x1;'
@@ -102,13 +102,14 @@ sensor:
   - platform: internal_temperature
     name: ${me} internal temperature
     id: temp
-    update_interval: 500ms
+    update_interval: 100ms
+    unit_of_measurement: °C
     filters:
-      - multiply: 2
       - sliding_window_moving_average:
           window_size: 10
           send_every: 10
           send_first_at: 10
+      - filter_out: nan
     on_value:
       then:
         - lambda: 'id(pub_count) |= 0x2;'
@@ -120,13 +121,14 @@ sensor:
     id: vbat
     attenuation: 12db # full scale is 2.450V
     accuracy_decimals: 2
-    update_interval: 500ms
+    update_interval: 100ms
     filters:
       - multiply: 2
       - sliding_window_moving_average:
           window_size: 10
           send_every: 10
           send_first_at: 10
+      - filter_out: nan
     on_value:
       then:
         - lambda: 'id(pub_count) |= 0x4;'
