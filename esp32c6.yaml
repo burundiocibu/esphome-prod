@@ -8,6 +8,11 @@ esphome:
     - priority: 0
       then:
         - deep_sleep.prevent: sleeper
+    - priority: -50
+      then:
+        - lambda: |-
+            id(sleeper).set_run_duration(id(sleep_duration) * 1000);
+            ESP_LOGI("boot", "millis:%d, sleep_duration:%d, pub_count:%0x", millis(), id(sleep_duration), id(pub_count));
 
 esp32:
   board: sparkfun_esp32c6_thing_plus
@@ -18,14 +23,7 @@ external_components:
   - source: github://burundiocibu/c6_adc
 
 logger:
-  level: DEBUG
-  logs:
-    sensor: ERROR
-
-api:
-  encryption:
-    key: !secret esp_api_key
-  batch_delay: 0ms
+  level: INFO
 
 ota:
   - platform: esphome
@@ -50,60 +48,66 @@ web_server:
 deep_sleep:
   id: sleeper
   sleep_duration: 60s
-  run_duration: 15s
+  run_duration: 30s
 
 globals:
   - id: pub_count
     type: int
     initial_value: "0"
+  - id: sleep_duration
+    type: long
+    initial_value: "0"
 
 script:
-  - id: bedtime
+  - id: check_all_published
     mode: queued
     then:
-      - delay: 50ms
       - lambda: |-
-          ESP_LOGV("bedtime", "millis:%d, pub_count:%0x, sleep_duration:%f", millis(), id(pub_count), id(sleep_duration).state);
-          bool connected = ! std::isnan(id(sleep_duration).state);
-          if (id(pub_count) == 0x7 && id(sleep_duration).state > 0 && connected)
+          ESP_LOGI("check", "millis:%d, pub_count:%0x, sleep_duration:%d", millis(), id(pub_count), id(sleep_duration));
+          if (id(sleep_duration) > 0 && id(pub_count) == 0x7 && id(mqtt_client)->is_connected())
           {
+            ESP_LOGI("check", "going to sleep");
             id(pub_count) = 0;
-            id(sleeper).set_sleep_duration(id(sleep_duration).state * 1000);
+            id(sleeper).set_sleep_duration(id(sleep_duration) * 1000);
             id(sleeper).begin_sleep(true);
           }
 
-text_sensor:
-  - platform: version
-    name: ${me} ESPHome Version
-
-switch:
-  - platform: restart
-    name: ${me} restart
-
-output:
-  - platform: gpio
-    pin: 23
-    id: status_led
+mqtt:
+  broker: !secret mqtt_broker
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  id: mqtt_client
+  discovery: true
+  # Set these empty so the device is not marked missing by home assistant
+  will_message:
+  birth_message:
+  idf_send_async: true
+  shutdown_message:
+    topic: ${me}/status
+    payload: "offline"
+    qos: 1
+  on_json_message: 
+    topic: ${me}/cmd/set
+    then:
+      - globals.set:
+          id: sleep_duration
+          value: !lambda |-
+            long duration = id(sleep_duration);
+            if (x.containsKey("sleep_duration"))
+            {
+              id(pub_count) |= 0x1;
+              duration = long(x["sleep_duration"]);
+              ESP_LOGI("main", "Rx cmd/set, sleep_duration to %d seconds.", duration);
+            }
+            return duration;
 
 sensor:
-  - platform: wifi_signal
-    name: ${me} wifi signal
-    id: snr
-    update_interval: 1s
-    on_value:
-      then:
-        - lambda: 'id(pub_count) |= 0x1;'
-        - script.execute: bedtime
-
-  - platform: homeassistant
-    entity_id: input_select.sleep_duration_2
-    id: sleep_duration
-
   - platform: internal_temperature
     name: ${me} internal temperature
     id: temp
-    update_interval: 100ms
+    update_interval: 250ms
     unit_of_measurement: °C
+    qos: 1
     filters:
       - sliding_window_moving_average:
           window_size: 10
@@ -113,7 +117,7 @@ sensor:
     on_value:
       then:
         - lambda: 'id(pub_count) |= 0x2;'
-        - script.execute: bedtime
+        - script.execute: check_all_published
 
   - platform: c6_adc
     pin: GPIO1
@@ -121,7 +125,8 @@ sensor:
     id: vbat
     attenuation: 12db # full scale is 2.450V
     accuracy_decimals: 2
-    update_interval: 100ms
+    update_interval: 250ms
+    qos: 1
     filters:
       - multiply: 2
       - sliding_window_moving_average:
@@ -132,4 +137,4 @@ sensor:
     on_value:
       then:
         - lambda: 'id(pub_count) |= 0x4;'
-        - script.execute: bedtime
+        - script.execute: check_all_published
