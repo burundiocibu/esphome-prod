@@ -86,6 +86,11 @@ mqtt:
     topic: ${me}/status
     payload: "offline"
     qos: 1
+  on_connect: 
+    then:
+      - lambda: |-
+          ESP_LOGI("mqtt", "on connect millis:%d", millis());
+          
   on_json_message: 
     topic: ${me}/cmd/set
     then:
