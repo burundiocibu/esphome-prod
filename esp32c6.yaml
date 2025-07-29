@@ -8,11 +8,6 @@ esphome:
     - priority: 0
       then:
         - deep_sleep.prevent: sleeper
-    - priority: -50
-      then:
-        - lambda: |-
-            id(sleeper).set_run_duration(id(sleep_duration) * 1000);
-            ESP_LOGI("boot", "millis:%d, sleep_duration:%d, pub_count:%0x", millis(), id(sleep_duration), id(pub_count));
 
 esp32:
   board: sparkfun_esp32c6_thing_plus
@@ -51,26 +46,9 @@ deep_sleep:
   run_duration: 30s
 
 globals:
-  - id: pub_count
-    type: int
-    initial_value: "0"
   - id: sleep_duration
     type: long
     initial_value: "0"
-
-script:
-  - id: check_all_published
-    mode: queued
-    then:
-      - lambda: |-
-          ESP_LOGI("check", "millis:%d, pub_count:%0x, sleep_duration:%d", millis(), id(pub_count), id(sleep_duration));
-          if (id(sleep_duration) > 0 && id(pub_count) == 0x7 && id(mqtt_client)->is_connected())
-          {
-            ESP_LOGI("check", "going to sleep");
-            id(pub_count) = 0;
-            id(sleeper).set_sleep_duration(id(sleep_duration) * 1000);
-            id(sleeper).begin_sleep(true);
-          }
 
 mqtt:
   broker: !secret mqtt_broker
@@ -81,30 +59,21 @@ mqtt:
   # Set these empty so the device is not marked missing by home assistant
   will_message:
   birth_message:
-  idf_send_async: true
-  shutdown_message:
-    topic: ${me}/status
-    payload: "offline"
-    qos: 1
-  on_connect: 
+  on_json_message: 
+    topic: ${me}/cmd/sleep
     then:
       - lambda: |-
-          ESP_LOGI("mqtt", "on connect millis:%d", millis());
-          
-  on_json_message: 
-    topic: ${me}/cmd/set
-    then:
-      - globals.set:
-          id: sleep_duration
-          value: !lambda |-
-            long duration = id(sleep_duration);
-            if (x.containsKey("sleep_duration"))
-            {
-              id(pub_count) |= 0x1;
-              duration = long(x["sleep_duration"]);
-              ESP_LOGI("main", "Rx cmd/set, sleep_duration to %d seconds.", duration);
-            }
-            return duration;
+          unsigned duration = 60;
+          if (x.containsKey("duration"))
+            duration = long(x["duration"]);
+          if (duration > 0)
+          {
+            unsigned sd = duration*1000 - millis();
+            sd = min(duration*1000, sd);
+            ESP_LOGI("sleeping", "millis:%d, duration:%d", millis(), sd);
+            id(sleeper).set_sleep_duration(sd);
+            id(sleeper).begin_sleep(true);
+          }
 
 sensor:
   - platform: internal_temperature
@@ -112,17 +81,11 @@ sensor:
     id: temp
     update_interval: 250ms
     unit_of_measurement: °C
-    qos: 1
     filters:
       - sliding_window_moving_average:
           window_size: 10
           send_every: 10
           send_first_at: 10
-      - filter_out: nan
-    on_value:
-      then:
-        - lambda: 'id(pub_count) |= 0x2;'
-        - script.execute: check_all_published
 
   - platform: c6_adc
     pin: GPIO1
@@ -131,15 +94,9 @@ sensor:
     attenuation: 12db # full scale is 2.450V
     accuracy_decimals: 2
     update_interval: 250ms
-    qos: 1
     filters:
       - multiply: 2
       - sliding_window_moving_average:
           window_size: 10
           send_every: 10
           send_first_at: 10
-      - filter_out: nan
-    on_value:
-      then:
-        - lambda: 'id(pub_count) |= 0x4;'
-        - script.execute: check_all_published
