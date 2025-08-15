@@ -1,8 +1,3 @@
-# wemos d1 mini w oled 0.66 shield (SSD1306 driver on I2C 0x3c)
-# 64x48 pixels across
-# i2c buttons at i2c 0x31
-# HX711 interface to strain gauge
-
 substitutions:
   me: pool-level2 
 
@@ -54,7 +49,7 @@ i2c:
 one_wire:
   - platform: gpio
     pin:
-      number: D3
+      number: GPIO2
       mode:
         input: true
         pullup: true
@@ -68,16 +63,36 @@ sensor:
     name: ${me} wifi signal
     update_interval: 120s
 
-  # Milone 12" eTape: 400-2k resistance nom, 2k ref nom
-  # ref resistance measured as 2.54k
-  # Connected as a wheatstone bridge with 2k resistors as the top of the bridge
-  # out of water, -27.9 mv, 133.8mv in 145 mm of water
+  # Resistive level sensor. 33.5 ohm full, 244 ohm empty
+  # Connected as a wheatstone bridge with 10k resistors as the top of the bridge
+  # and a 100 ohm resister across from the sensor
+  # Rx:33, Vg:3.84 mV
+  # Rx:90, Vg:0.572 mV
+  # Rx:240, Vg:-7.98 mV
   - platform: nau7802
     name: "NAU7802"
-    gain: 1
+    gain: 32
     samples_per_second: 10
-    offset_calibration: 163000
+    offset_calibration: 1800
     gain_calibration: 1
     ldo_voltage: "2.7V"
-    update_interval: 1s
+    update_interval: .125s
     unit_of_measurement: cnt
+    filters:
+      - sliding_window_moving_average:
+          window_size: 50
+          send_every: 50
+
+  - platform: dallas_temp
+    name: dt1
+    address: 0xb23c01d07579b428
+    accuracy_decimals: 2
+    update_interval: 1s
+
+  - platform: dallas_temp
+    name: dt2
+    address: 0xf701205f7aff6528
+    accuracy_decimals: 2
+    update_interval: 1s
+
+
