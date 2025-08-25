@@ -12,10 +12,6 @@ esphome:
   name: ${me}
   comment: seeed esp32c3
   area: Pool
-  on_boot:
-    - priority: 0
-      then:
-        - deep_sleep.prevent: sleeper
 
 esp32:
   board: seeed_xiao_esp32c3
@@ -49,36 +45,10 @@ ota:
     password: !secret esp_ota_pw
     id: my_ota
 
-deep_sleep:
-  id: sleeper
-  sleep_duration: 300s # Dummy value, should never be used
-  run_duration: 60s # Ditto. just for when there is no cmd/set msg to be had.
-
-mqtt:
-  broker: !secret mqtt_broker
-  username: !secret mqtt_username
-  password: !secret mqtt_password
-  id: mqtt_client
-  discovery: true
-  # Set these empty so the device is not marked missing by home assistant
-  will_message:
-  birth_message:
-  on_json_message: 
-    topic: ${me}/cmd/sleep
-    then:
-      - lambda: |-
-          unsigned duration = 60;
-          if (x.containsKey("duration"))
-            duration = long(x["duration"]);
-          if (duration > 0)
-          {
-            unsigned sd = duration*1000 - millis();
-            sd = min(duration*1000, sd);
-            ESP_LOGI("sleeping", "millis:%d, duration:%d", millis(), sd);
-            id(sleeper).set_sleep_duration(sd);
-            id(sleeper).begin_sleep(true);
-          }
-
+api:
+  encryption:
+    key: !secret esp_api_key
+  
 text_sensor:
   - platform: version
     name: ${me} ESPHome Version
@@ -106,7 +76,6 @@ sensor:
     id: temp
     update_interval: 12s
     filters:
-      - filter_out: NAN
       - sliding_window_moving_average:
           window_size: 10
           send_every: 10
@@ -120,31 +89,34 @@ sensor:
     id: vbat
     attenuation: 12db # full scale is 4.2V
     accuracy_decimals: 2
-    update_interval: 12s
+    update_interval: 1s
     filters:
       - multiply: 2
       - sliding_window_moving_average:
           window_size: 10
           send_every: 10
           send_first_at: 10
-      - filter_out: NAN
 
-  - platform: adc
-    # aka D0, Has a 100k/100k resistive divider to Vbat
-    # Also note that the battery voltage drops about .15 V when under the 80mA load
-    pin: GPIO3
-    name: ${me} vpres
-    id: vpres
-    attenuation: 12db # full scale is 4.2V
-    accuracy_decimals: 3
-    update_interval: 12s
+  - platform: honeywellabp2_i2c
+    update_interval: 1s
+    pressure:
+      name: ${me} pressure
+      id: pressure
+      # default units are Pa. This is +-10"H2O as per the datasheet
+      accuracy_decimals: 3
+      min_pressure: -2490
+      max_pressure: +2490
+      transfer_function: "A"
+
+  - platform: template
+    name: ${me} level
+    lambda: "return id(pressure).state;"
+    unit_of_measurement: cm
+    update_interval: 1s
+    accuracy_decimals: 1
     filters:
-      - multiply: 2
-      - sliding_window_moving_average:
-          window_size: 10
-          send_every: 10
-          send_first_at: 10
-      - filter_out: NAN
+      - offset: -9
+      - multiply: 0.010197
 
   - platform: dallas_temp
     address: 0xd63c01d075a4ef28
@@ -152,5 +124,3 @@ sensor:
     accuracy_decimals: 2
     update_interval: 120s
     unit_of_measurement: °C
-    filters:
-      - filter_out: NAN
