@@ -1,12 +1,20 @@
+# https://learn.adafruit.com/esp32-s3-reverse-tft-feather/pinouts
+
+
 substitutions:
   me: current-logger
 
 esphome:
   name: ${me}
-  comment: seeed esp32s3
+  comment: adafruit esp32-s3-reverse-tft-feather
+  on_boot: 
+    then:
+      - output.turn_on: tfti2c_pwr
 
 esp32:
-  board: seeed_xiao_esp32s3
+  board: adafruit_feather_esp32s3_tft
+  framework:
+    type: arduino
     
 wifi:
   ssid: !secret wifi_ssid
@@ -41,8 +49,23 @@ switch:
     name: ${me} restart
 
 i2c:
-  sda: GPIO5
-  scl: GPIO6
+  sda: GPIO3
+  scl: GPIO4
+
+spi:
+  clk_pin: GPIO36
+  mosi_pin: GPIO35
+  miso_pin: GPIO37
+
+output:
+  - platform: gpio
+    pin: GPIO7
+    id: tfti2c_pwr
+  
+  - platform: gpio
+    pin: GPIO13
+    id: led
+
 
 sensor:
   - platform: uptime
@@ -53,13 +76,12 @@ sensor:
     name: ${me} wifi signal
     update_interval: 5s
 
-  - platform: ina226
+  - platform: ina2xx_i2c
     address: 0x40
-    shunt_resistance: 1 ohm
-    max_current: .32A
+    model: INA228
+    shunt_resistance: 0.015 ohm
+    max_current: 10A
     update_interval: 100ms
-    adc_time: 1100us
-    adc_averaging: 16
     current:
       name: ${me} current
       id: ina_current
@@ -79,6 +101,21 @@ sensor:
     shunt_voltage:
       name: ${me} shunt voltage
       accuracy_decimals: 6
+      filters:
+        - throttle: 1s
+    energy: 
+      name: ${me} energy
+      accuracy_decimals: 6
+      filters:
+        - throttle: 1s
+    charge: 
+      name: ${me} charge
+      accuracy_decimals: 8
+      filters:
+        - throttle:  1s
+    temperature: 
+      name: ${me} ina temperature
+      accuracy_decimals: 2
       filters:
         - throttle: 1s
 
@@ -113,3 +150,19 @@ sensor:
       - min:
          window_size: 100
          send_every: 10
+
+  - platform: max17043
+    address: 0x36
+    battery_voltage:
+      name: ${me} battery boltage
+    battery_level:
+      name: ${me} battery
+
+display:
+  - platform: st7789v
+    model: TTGO_TDISPLAY_135X240
+    backlight_pin: GPIO45
+    dc_pin: GPIO40
+    reset_pin: GPIO41
+    cs_pin: GPIO42
+    show_test_card: true
