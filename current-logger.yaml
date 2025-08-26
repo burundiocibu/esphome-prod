@@ -85,9 +85,10 @@ sensor:
     current:
       name: ${me} current
       id: ina_current
-      accuracy_decimals: 5
+      accuracy_decimals: 3
+      unit_of_measurement: mA
       filters:
-        - throttle: 1s
+        - multiply: 1000
     power:
       name: ${me} power
       id: ina_power
@@ -108,8 +109,9 @@ sensor:
       accuracy_decimals: 6
       filters:
         - throttle: 1s
-    charge: 
+    charge:
       name: ${me} charge
+      id: charge
       accuracy_decimals: 8
       filters:
         - throttle:  1s
@@ -121,32 +123,39 @@ sensor:
 
   - platform: template
     name: ${me} avg current
+    id: avg_current
     lambda: "return id(ina_current).raw_state;"
     update_interval: 100ms
     accuracy_decimals: 5
+    unit_of_measurement: mA
     filters:
+      - multiply: 1000
       - sliding_window_moving_average:
           window_size: 100
           send_every: 10
 
   - platform: template
     name: ${me} max current
-    unit_of_measurement: A
+    id: max_current
     lambda: "return id(ina_current).raw_state;"
     update_interval: 100ms
-    accuracy_decimals: 5
+    accuracy_decimals: 3
+    unit_of_measurement: mA
     filters:
+      - multiply: 1000
       - max:
          window_size: 100
          send_every: 10
 
   - platform: template
     name: ${me} min current
-    unit_of_measurement: A
+    id: min_current
     lambda: "return id(ina_current).raw_state;"
     update_interval: 100ms
-    accuracy_decimals: 5
+    accuracy_decimals: 3
+    unit_of_measurement: mA
     filters:
+      - multiply: 1000
       - min:
          window_size: 100
          send_every: 10
@@ -158,6 +167,57 @@ sensor:
     battery_level:
       name: ${me} battery
 
+color:
+  - id: red
+    red: 100%
+    green: 0%
+    blue: 0%
+  - id: green
+    red: 0%
+    green: 100%
+    blue: 0%
+  - id: blue
+    red: 0%
+    green: 0%
+    blue: 100%
+  - id: yellow
+    red: 100%
+    green: 100%
+    blue: 0%
+  - id: white
+    red: 100%
+    green: 100%
+    blue: 100%
+
+font:
+  - file: "gfonts://Roboto"
+    id: roboto_14
+    size: 14
+    bpp: 4
+
+  - file: "gfonts://Roboto"
+    id: roboto_18
+    size: 18
+    bpp: 4
+
+graph:
+  - id: current_graph
+    duration: 1min
+    width: 239
+    height: 120
+    border: true
+    min_value: 0
+    max_value: 50
+    y_grid: 100
+    traces:
+      - sensor: ina_current
+        line_type: SOLID
+        color: white
+      - sensor: avg_current
+        line_type: SOLID
+        continuous: true
+        color: blue
+
 display:
   - platform: st7789v
     model: TTGO_TDISPLAY_135X240
@@ -165,4 +225,9 @@ display:
     dc_pin: GPIO40
     reset_pin: GPIO41
     cs_pin: GPIO42
-    show_test_card: true
+    rotation: 270
+    update_interval: 250ms
+    lambda: |-
+      it.graph(1, 0, id(current_graph));
+      it.printf(1, 120, id(roboto_14), id(white), "%6.2f, (%6.2f - %6.2f) mA",
+          id(avg_current).state, id(min_current).state, id(max_current).state);
