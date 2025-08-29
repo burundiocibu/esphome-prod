@@ -2,7 +2,7 @@
 # Vbuss is connected to a 5VDC solar cell
 # D0/A0/GPIO2 is connected to Vbat+ via a 100k/100k divider 
 
-# Deep sleep current, around 60uA with the level sensor connected
+# Deep sleep current, around 60uA
 # Awake current 30-80mA
 
 substitutions:
@@ -97,20 +97,24 @@ sensor:
           send_every: 10
           send_first_at: 10
 
-  - platform: honeywellabp2_i2c
-    update_interval: 1s
-    pressure:
-      name: ${me} pressure
-      id: pressure
-      # default units are Pa. This is +-10"H2O as per the datasheet
-      accuracy_decimals: 3
-      min_pressure: -2490
-      max_pressure: +2490
-      transfer_function: "A"
+  - platform: nau7802
+    name: "NAU7802"
+    id: vp
+    gain: 32
+    samples_per_second: 10
+    offset_calibration: 0
+    gain_calibration: 1
+    ldo_voltage: External
+    update_interval: .125s
+    unit_of_measurement: cnt
+    filters:
+      - sliding_window_moving_average:
+          window_size: 50
+          send_every: 50
 
   - platform: template
     name: ${me} level
-    lambda: "return id(pressure).state;"
+    lambda: "return id(vp).state;"
     unit_of_measurement: cm
     update_interval: 1s
     accuracy_decimals: 1
