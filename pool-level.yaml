@@ -32,13 +32,10 @@ wifi:
     dns1: 192.168.2.1
 
 web_server:
-  version: 2
+  version: 3
 
 logger:
-  level: DEBUG
-  logs:
-    sensor: ERROR
-    dallas.temp.sensor: ERROR
+  level: INFO
 
 ota:
   - platform: esphome
@@ -66,6 +63,10 @@ one_wire:
     pin: GPIO10
 
 sensor:
+  - platform: uptime
+    name: ${me} uptime
+    update_interval: 120s
+
   - platform: wifi_signal
     name: ${me} wifi signal
     id: snr
@@ -74,7 +75,7 @@ sensor:
   - platform: internal_temperature
     name: ${me} internal temperature
     id: temp
-    update_interval: 12s
+    update_interval: 1s
     filters:
       - sliding_window_moving_average:
           window_size: 10
@@ -89,42 +90,56 @@ sensor:
     id: vbat
     attenuation: 12db # full scale is 4.2V
     accuracy_decimals: 2
-    update_interval: 1s
+    update_interval: 100ms
     filters:
       - multiply: 2
       - sliding_window_moving_average:
-          window_size: 10
-          send_every: 10
-          send_first_at: 10
+          window_size: 50
+          send_every: 50
+          send_first_at: 50
 
   - platform: nau7802
     name: "NAU7802"
     id: vp
     gain: 32
-    samples_per_second: 10
+    samples_per_second: 20
     offset_calibration: 0
     gain_calibration: 1
     ldo_voltage: External
-    update_interval: .125s
+    update_interval: 60ms
     unit_of_measurement: cnt
     filters:
       - sliding_window_moving_average:
-          window_size: 50
-          send_every: 50
+          window_size: 100
+          send_every: 100
+
+  - platform: template
+    name: "NAU7802 corrected"
+    id: vpc
+    unit_of_measurement: cnt
+    update_interval: 1s
+    lambda: "return id(vp).state - 13000 * (id(t_w).state - 22.2);"
 
   - platform: template
     name: ${me} level
-    lambda: "return id(vp).state;"
+    lambda: "return id(vpc).state;"
     unit_of_measurement: cm
     update_interval: 1s
     accuracy_decimals: 1
     filters:
-      - offset: -9
-      - multiply: 0.010197
+      - calibrate_linear:
+          method: least_squares
+          datapoints:
+            - 359000 -> 5.6
+            - 478000 -> 8.6
+            - 600000 -> 11.6
+      - offset: -10.5
+          
 
   - platform: dallas_temp
     address: 0xd63c01d075a4ef28
     name: ${me} water temperature
-    accuracy_decimals: 2
-    update_interval: 120s
+    id: t_w
+    accuracy_decimals: 3
+    update_interval: 15s
     unit_of_measurement: °C
