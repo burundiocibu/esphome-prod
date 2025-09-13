@@ -4,10 +4,6 @@ substitutions:
 esphome:
   name: ${me}
   comment: sparkfun esp32c3
-  on_boot: 
-    - priority: 0
-      then:
-        - deep_sleep.prevent: sleeper
 
 esp32:
   board: sparkfun_esp32c6_thing_plus
@@ -20,15 +16,10 @@ external_components:
 logger:
   level: INFO
 
-ota:
-  - platform: esphome
-    password: !secret esp_ota_pw
-    id: my_ota
-
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-  fast_connect: true
+  fast_connect: false
   reboot_timeout: 60s
   id: wifi_id
   manual_ip: 
@@ -37,43 +28,34 @@ wifi:
     subnet: 255.255.255.0
     dns1: 192.168.2.1
 
+ota:
+  - platform: esphome
+    password: !secret esp_ota_pw
+    id: my_ota
+
+api:
+  encryption:
+    key: !secret esp_api_key
+
 web_server:
-  version: 2
+  version: 3
 
-deep_sleep:
-  id: sleeper
-  sleep_duration: 60s
-  run_duration: 30s
 
-globals:
-  - id: sleep_duration
-    type: long
-    initial_value: "0"
+# color  signal  abp2   ds18b20  esp32c6
+# Red    +3.3     2      1        3V3
+# Black  gnd      1      3        GND
+# Yellow sda      5               IO3
+# Green  scl      6               IO4
+# Orange 1wire           2        IO2
+#
 
-mqtt:
-  broker: !secret mqtt_broker
-  username: !secret mqtt_username
-  password: !secret mqtt_password
-  id: mqtt_client
-  discovery: true
-  # Set these empty so the device is not marked missing by home assistant
-  will_message:
-  birth_message:
-  on_json_message: 
-    topic: ${me}/cmd/sleep
-    then:
-      - lambda: |-
-          unsigned duration = 60;
-          if (x.containsKey("duration"))
-            duration = long(x["duration"]);
-          if (duration > 0)
-          {
-            unsigned sd = duration*1000 - millis();
-            sd = min(duration*1000, sd);
-            ESP_LOGI("sleeping", "millis:%d, duration:%d", millis(), sd);
-            id(sleeper).set_sleep_duration(sd);
-            id(sleeper).begin_sleep(true);
-          }
+i2c:
+  sda: GPIO3
+  scl: GPIO4
+
+one_wire:
+  - platform: gpio
+    pin: GPIO2
 
 sensor:
   - platform: internal_temperature
@@ -100,3 +82,36 @@ sensor:
           window_size: 10
           send_every: 10
           send_first_at: 10
+
+  - platform: dallas_temp
+    name: t1
+    address: 0xe9011877b40fff28
+    update_interval: 10s
+
+  - platform: honeywellabp2_i2c
+    # ABP2DRRT060MD2A3XX
+    address: 0x28
+    update_interval: 500ms
+    pressure:
+      name: pressure
+      id: p
+      min_pressure: -60
+      max_pressure: 60
+      transfer_function: "A"
+      unit_of_measurement: mBar
+      accuracy_decimals: 4
+      filters: 
+        - offset: -0.4360
+        - sliding_window_moving_average:
+            window_size: 10
+            send_every: 10
+            send_first_at: 10
+
+  - platform: template
+    lambda: "return id(p).state;"
+    name: level
+    update_interval: 10s
+    unit_of_measurement: cm
+    accuracy_decimals: 2
+    filters:
+      - multiply: 1.0197
