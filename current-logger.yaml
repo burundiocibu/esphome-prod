@@ -163,9 +163,9 @@ sensor:
   - platform: max17043
     address: 0x36
     battery_voltage:
-      name: ${me} battery boltage
+      name: ${me} battery voltage
     battery_level:
-      name: ${me} battery
+      name: ${me} battery level
 
 color:
   - id: red
