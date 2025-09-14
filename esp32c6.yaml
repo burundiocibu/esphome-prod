@@ -40,7 +40,6 @@ api:
 web_server:
   version: 3
 
-
 # color  signal  abp2   ds18b20  esp32c6
 # Red    +3.3     2      1        3V3
 # Black  gnd      1      3        GND
@@ -91,7 +90,7 @@ sensor:
   - platform: honeywellabp2_i2c
     # ABP2DRRT060MD2A3XX
     address: 0x28
-    update_interval: 500ms
+    update_interval: 200ms
     pressure:
       name: pressure
       id: p
@@ -101,11 +100,11 @@ sensor:
       unit_of_measurement: mBar
       accuracy_decimals: 4
       filters: 
-        - offset: -0.4360
-        - sliding_window_moving_average:
-            window_size: 10
-            send_every: 10
-            send_first_at: 10
+        - offset: -0.4362
+        - median:
+            window_size: 25
+            send_every: 25
+            send_first_at: 5
 
   - platform: template
     lambda: "return id(p).state;"
@@ -114,4 +113,4 @@ sensor:
     unit_of_measurement: cm
     accuracy_decimals: 2
     filters:
-      - multiply: 1.0197
+      - multiply: 1.0197 # by the book mBar->cmH20
