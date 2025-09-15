@@ -1,22 +1,20 @@
-# Vbat on the back of the board is connected to an 18650 LiIon cell
-# Vbuss is connected to a 5VDC solar cell
-# D0/A0/GPIO2 is connected to Vbat+ via a 100k/100k divider 
-
-# Deep sleep current, around 60uA
-# Awake current 30-80mA
-
 substitutions:
   me: "pool-level"
 
 esphome:
   name: ${me}
-  comment: seeed esp32c3
-  area: Pool
+  comment: sparkfun esp32c3
 
 esp32:
-  board: seeed_xiao_esp32c3
+  board: sparkfun_esp32c6_thing_plus
   framework:
     type: esp-idf
+
+external_components:
+  - source: github://burundiocibu/c6_adc
+
+logger:
+  level: INFO
 
 wifi:
   ssid: !secret wifi_ssid
@@ -24,18 +22,11 @@ wifi:
   fast_connect: false
   reboot_timeout: 60s
   id: wifi_id
-  power_save_mode: HIGH
   manual_ip: 
-    static_ip: 192.168.2.26
+    static_ip: 192.168.2.197
     gateway: 192.168.2.1
     subnet: 255.255.255.0
     dns1: 192.168.2.1
-
-web_server:
-  version: 3
-
-logger:
-  level: INFO
 
 ota:
   - platform: esphome
@@ -45,101 +36,81 @@ ota:
 api:
   encryption:
     key: !secret esp_api_key
-  
-text_sensor:
-  - platform: version
-    name: ${me} ESPHome Version
 
-switch:
-  - platform: restart
-    name: ${me} restart
+web_server:
+  version: 3
+
+# color  signal  abp2   ds18b20  esp32c6
+# Red    +3.3     2      1        3V3
+# Black  gnd      1      3        GND
+# Yellow sda      5               IO3
+# Green  scl      6               IO4
+# Orange 1wire           2        IO2
+#
 
 i2c:
-  sda: GPIO6
-  scl: GPIO7
+  sda: GPIO3
+  scl: GPIO4
 
 one_wire:
   - platform: gpio
-    pin: GPIO10
+    pin: GPIO2
 
 sensor:
-  - platform: uptime
-    name: ${me} uptime
-    update_interval: 120s
-
-  - platform: wifi_signal
-    name: ${me} wifi signal
-    id: snr
-    update_interval: 120s
-
   - platform: internal_temperature
     name: ${me} internal temperature
     id: temp
-    update_interval: 1s
+    update_interval: 250ms
+    unit_of_measurement: °C
     filters:
       - sliding_window_moving_average:
           window_size: 10
           send_every: 10
           send_first_at: 10
 
-  - platform: adc
-    # aka D0, Has a 100k/100k resistive divider to Vbat
-    # Also note that the battery voltage drops about .15 V when under the 80mA load
-    pin: GPIO2
+  - platform: c6_adc
+    pin: GPIO1
     name: ${me} vbat
     id: vbat
-    attenuation: 12db # full scale is 4.2V
+    attenuation: 12db # full scale is 2.450V
     accuracy_decimals: 2
-    update_interval: 100ms
+    update_interval: 250ms
     filters:
       - multiply: 2
       - sliding_window_moving_average:
-          window_size: 50
-          send_every: 50
-          send_first_at: 50
-
-  - platform: nau7802
-    name: "NAU7802"
-    id: vp
-    gain: 32
-    samples_per_second: 20
-    offset_calibration: 0
-    gain_calibration: 1
-    ldo_voltage: External
-    update_interval: 60ms
-    unit_of_measurement: cnt
-    filters:
-      - sliding_window_moving_average:
-          window_size: 100
-          send_every: 100
-
-  - platform: template
-    name: "NAU7802 corrected"
-    id: vpc
-    unit_of_measurement: cnt
-    update_interval: 1s
-    lambda: "return id(vp).state - 13000 * (id(t_w).state - 22.2);"
-
-  - platform: template
-    name: ${me} level
-    lambda: "return id(vpc).state;"
-    unit_of_measurement: cm
-    update_interval: 1s
-    accuracy_decimals: 1
-    filters:
-      - calibrate_linear:
-          method: least_squares
-          datapoints:
-            - 359000 -> 5.6
-            - 478000 -> 8.6
-            - 600000 -> 11.6
-      - offset: -10.5
-          
+          window_size: 10
+          send_every: 10
+          send_first_at: 10
 
   - platform: dallas_temp
-    address: 0xd63c01d075a4ef28
-    name: ${me} water temperature
-    id: t_w
-    accuracy_decimals: 3
-    update_interval: 15s
-    unit_of_measurement: °C
+    name: t1
+    address: 0xe9011877b40fff28
+    update_interval: 10s
+
+  - platform: honeywellabp2_i2c
+    # ABP2DRRT060MD2A3XX
+    address: 0x28
+    update_interval: 200ms
+    pressure:
+      name: pressure
+      id: p
+      min_pressure: -60
+      max_pressure: 60
+      transfer_function: "A"
+      unit_of_measurement: mBar
+      accuracy_decimals: 4
+      filters: 
+        - offset: -0.4362
+        - median:
+            window_size: 25
+            send_every: 25
+            send_first_at: 5
+
+  - platform: template
+    lambda: "return id(p).state;"
+    name: level
+    update_interval: 10s
+    unit_of_measurement: cm
+    accuracy_decimals: 2
+    filters:
+      - multiply: 1.0197 # by the book mBar->cmH20
