@@ -1,6 +1,5 @@
 # https://learn.adafruit.com/esp32-s3-reverse-tft-feather/pinouts
 
-
 substitutions:
   me: current-logger
 
@@ -14,7 +13,7 @@ esphome:
 esp32:
   board: adafruit_feather_esp32s3_tft
   framework:
-    type: arduino
+    type: esp-idf
     
 wifi:
   ssid: !secret wifi_ssid
@@ -48,6 +47,11 @@ switch:
   - platform: restart
     name: ${me} restart
 
+button:
+  - platform: template
+    name: "Reset counters"
+    on_press:
+       - lambda: "id(ina288).reset_energy_counters();"
 i2c:
   sda: GPIO3
   scl: GPIO4
@@ -66,7 +70,6 @@ output:
     pin: GPIO13
     id: led
 
-
 sensor:
   - platform: uptime
     name: ${me} uptime
@@ -82,6 +85,7 @@ sensor:
     shunt_resistance: 0.015 ohm
     max_current: 10A
     update_interval: 100ms
+    id: ina288
     current:
       name: ${me} current
       id: ina_current
@@ -231,3 +235,4 @@ display:
       it.graph(1, 0, id(current_graph));
       it.printf(1, 120, id(roboto_14), id(white), "%6.2f, (%6.2f - %6.2f) mA",
           id(avg_current).state, id(min_current).state, id(max_current).state);
+
