@@ -62,6 +62,7 @@ sensor:
     id: temp
     update_interval: 250ms
     unit_of_measurement: °C
+    accuracy_decimals: 2
     filters:
       - sliding_window_moving_average:
           window_size: 10
@@ -85,6 +86,7 @@ sensor:
   - platform: dallas_temp
     name: t1
     address: 0xe9011877b40fff28
+    accuracy_decimals: 3
     update_interval: 10s
 
   - platform: honeywellabp2_i2c

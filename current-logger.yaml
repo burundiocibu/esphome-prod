@@ -1,5 +1,4 @@
 # https://learn.adafruit.com/esp32-s3-reverse-tft-feather/pinouts
-
 substitutions:
   me: current-logger
 
@@ -52,6 +51,7 @@ button:
     name: "Reset counters"
     on_press:
        - lambda: "id(ina288).reset_energy_counters();"
+
 i2c:
   sda: GPIO3
   scl: GPIO4
@@ -69,6 +69,17 @@ output:
   - platform: gpio
     pin: GPIO13
     id: led
+
+binary_sensor:
+  - platform: gpio
+    pin: GPIO1
+    id: D1_button
+  - platform: gpio
+    pin: GPIO2
+    id: D2_button
+  - platform: gpio
+    pin: GPIO0
+    id: D0_button
 
 sensor:
   - platform: uptime
@@ -100,6 +111,7 @@ sensor:
         - throttle: 1s
     bus_voltage:
       name: ${me} bus voltage
+      id: buss_v
       accuracy_decimals: 4
       filters:
         - throttle: 1s
@@ -110,6 +122,7 @@ sensor:
         - throttle: 1s
     energy: 
       name: ${me} energy
+      id: energy
       accuracy_decimals: 6
       filters:
         - throttle: 1s
@@ -232,7 +245,12 @@ display:
     rotation: 270
     update_interval: 250ms
     lambda: |-
-      it.graph(1, 0, id(current_graph));
-      it.printf(1, 120, id(roboto_14), id(white), "%6.2f, (%6.2f - %6.2f) mA",
-          id(avg_current).state, id(min_current).state, id(max_current).state);
+      it.printf(1, 0, id(roboto_18), id(white), "current: %6.2f mA",
+          id(avg_current).state);
+      it.printf(1, 20, id(roboto_18), id(white), "   %6.2f ... %6.2f mA",
+          id(min_current).state, id(max_current).state);
+      it.printf(1, 40, id(roboto_18), id(white), "voltage: %6.2f V",
+          id(buss_v).state);
+      it.printf(1, 60, id(roboto_18), id(white), "energy: %6.2f Wh",
+          id(energy).state);
 

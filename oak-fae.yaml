@@ -1,0 +1,47 @@
+substitutions:
+  me: oak-fae
+
+esphome:
+  name: ${me}
+
+esp32:
+  board: seeed_xiao_esp32c6
+  framework:
+    type: esp-idf
+
+# Enable logging
+logger:
+
+api:
+  encryption:
+    key: !secret esp_api_key
+
+ota:
+  - platform: esphome
+    password: !secret esp_ota_pw
+    id: my_ota
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+web_server:
+
+output:
+  - platform: ledc
+    id: pina
+    pin: GPIO23
+    frequency: 5000
+  - platform: ledc
+    id: pinb
+    pin: GPIO16
+    frequency: 5000
+
+light:
+  - platform: hbridge
+    name: ${me} lights
+    pin_a: pina
+    pin_b: pinb
+
+  
+    
