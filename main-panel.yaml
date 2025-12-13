@@ -44,6 +44,8 @@ esphome:
 
 esp32:
   board: esp32-pro
+  framework:
+    type: esp-idf
 
 wifi:
   ssid: !secret wifi_ssid

@@ -34,6 +34,8 @@ esphome:
 
 esp32:
   board: tinypico
+  framework:
+    type: esp-idf
 
 wifi:
   ssid: !secret wifi_ssid
