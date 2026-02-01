@@ -1,6 +1,6 @@
 # This is for a sonoff S31 power measuring socket (not the lite version)
 substitutions:
-  me: pearl-charger
+  me: "greenhose-heater-south"
 esphome:
   name: ${me}
   comment: Sonoff S31
