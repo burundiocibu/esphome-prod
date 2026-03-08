@@ -181,8 +181,10 @@ sensor:
     address: 0x36
     battery_voltage:
       name: ${me} battery voltage
+      id: battery_voltage
     battery_level:
       name: ${me} battery level
+      id: battery_level
 
 color:
   - id: red
@@ -253,4 +255,6 @@ display:
           id(buss_v).state);
       it.printf(1, 60, id(roboto_18), id(white), "energy: %6.2f Wh",
           id(energy).state);
+      it.printf(1, 80, id(roboto_18), id(white), "battery: %3.1f %% , %4.2f V",
+          id(battery_level).state, id(battery_voltage).state);
 
