@@ -69,7 +69,7 @@ sensor:
       accuracy_decimals: 2
       filters:
         - median
-        - offset: -2.60
+        - offset: -0.40
     pressure:
       name: ${me} return pressure
       id: pr
