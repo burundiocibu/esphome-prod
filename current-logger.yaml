@@ -148,7 +148,7 @@ sensor:
     filters:
       - multiply: 1000
       - sliding_window_moving_average:
-          window_size: 100
+          window_size: 10
           send_every: 10
 
   - platform: template
