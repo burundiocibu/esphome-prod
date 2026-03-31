@@ -95,7 +95,7 @@ sensor:
     model: INA228
     shunt_resistance: 0.015 ohm
     max_current: 10A
-    update_interval: 100ms
+    update_interval: 50ms
     id: ina288
     current:
       name: ${me} current
@@ -142,14 +142,14 @@ sensor:
     name: ${me} avg current
     id: avg_current
     lambda: "return id(ina_current).raw_state;"
-    update_interval: 100ms
+    update_interval: 3000ms
     accuracy_decimals: 5
     unit_of_measurement: mA
     filters:
       - multiply: 1000
       - sliding_window_moving_average:
-          window_size: 10
-          send_every: 10
+          window_size: 60
+          send_every: 60
 
   - platform: template
     name: ${me} max current
@@ -245,7 +245,7 @@ display:
     reset_pin: GPIO41
     cs_pin: GPIO42
     rotation: 270
-    update_interval: 250ms
+    update_interval: 500ms
     lambda: |-
       it.printf(1, 0, id(roboto_18), id(white), "current: %6.2f mA",
           id(avg_current).state);

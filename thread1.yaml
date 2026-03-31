@@ -26,9 +26,9 @@ network:
  
 openthread:
   device_type: MTD
+  force_dataset: True
+  output_power: 8dBm
   tlv: 0e080000000000010000000300000f4a0300001535060004001fffe00208d048b6c2bb035b310708fdc224ebeb1bd67f051031ef9e2d3d6fe3acff931e9e82bb14d2030e68612d7468726561642d313631620102161b0410625716294324d7a2013e2100d549ff0e0c0402a0f7f8
-  # really can't OTA flash this if we set a poll period
-  #poll_period: 60s
 
 web_server:
   port: 80
