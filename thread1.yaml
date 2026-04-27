@@ -1,16 +1,33 @@
 substitutions:
   me: thread1
 
+# max vbuss voltate 6.5V
 esphome:
   name: ${me}
   comment: supermini esp32h2
- 
+  on_boot:
+    then:
+      - lambda: App.set_loop_interval(100);
+
+external_components:
+  - source: github://pr#12325
+    components: [power_management]
+    refresh: 1h
+  - source: github://pr#11766
+    components: [openthread]
+    refresh: 1h
+
 esp32:
   variant: ESP32H2
   framework:
     type: esp-idf
- 
+    sdkconfig_options:
+      CONFIG_USJ_NO_AUTO_LS_ON_CONNECTION: n # doesn't seem to matter
+
 logger:
+  level: info
+  #hardware_uart: UART0
+  #baud_rate: 0
  
 api:
   encryption:
@@ -28,27 +45,45 @@ openthread:
   device_type: MTD
   force_dataset: True
   output_power: 8dBm
+  poll_period: 30s
   tlv: 0e080000000000010000000300000f4a0300001535060004001fffe00208d048b6c2bb035b310708fdc224ebeb1bd67f051031ef9e2d3d6fe3acff931e9e82bb14d2030e68612d7468726561642d313631620102161b0410625716294324d7a2013e2100d549ff0e0c0402a0f7f8
 
-web_server:
-  port: 80
+power_management:
+  id: pm_id
+  enable_light_sleep: true
+  power_down_flash: true
+  power_down_peripherals: false
+  profiling: true
+
+interval:
+  - interval: 15s
+    then:
+      - lambda: |-
+          extern esp_err_t esp_pm_dump_locks(FILE* stream);
+          char buf[2048];
+          FILE *f = fmemopen(buf, sizeof(buf), "w");
+          if (f != nullptr) {
+            esp_pm_dump_locks(f);
+            fclose(f);
+            ESP_LOGI("pm_dump", "\n%s", buf);
+          }
 
 sensor:
   - platform: uptime
     name: ${me} uptime
-    update_interval: 120s
+    update_interval: 30s
 
-light:
-  - platform: esp32_rmt_led_strip
-    rgb_order: GRB
-    pin: GPIO8
-    num_leds: 1
-    chipset: WS2812
-    id: status_led
-    name: rgb
-    icon: "mdi:led-outline"
-    default_transition_length: 0.25s
-    effects:
-      - random:
-      - flicker:
-      - addressable_rainbow:
+switch:
+  - platform: template
+    name: "Radio Always On"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      then:
+        - logger.log: "Set Radio Always On"
+        - openthread.pollperiod: 0s
+
+    turn_off_action:
+      then:
+        - logger.log: "Set Radio Off When Idle"
+        - openthread.pollperiod: 5s
