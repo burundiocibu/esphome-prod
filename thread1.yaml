@@ -91,6 +91,13 @@ interval:
             fclose(f);
             ESP_LOGI("pm_dump", "\n%s", buf);
           }
+  - interval: 30s
+    then:
+      - switch.turn_on: sensor_power
+      - delay: 20ms
+      - component.update: nau_raw
+      - delay: 1s
+      - switch.turn_off: sensor_power  
 
 sensor:
   - platform: uptime
@@ -101,7 +108,7 @@ sensor:
     id: nau_raw
     gain: 128
     ldo_voltage: 3.0V
-    update_interval: 30s
+    update_interval: never
 
   - platform: template
     name: ${me} depth
@@ -140,6 +147,10 @@ switch:
         - logger.log: "Set Radio Off When Idle"
         - openthread.pollperiod: 30s
 
+  - platform: gpio
+    id: sensor_power
+    pin: 13
+        
 button:
   - platform: template
     name: "Tare"
@@ -155,15 +166,4 @@ button:
           format: "setting cal100_count to %.1f"
           args: ['id(nau_raw).state']
       - lambda: 'id(cal100_count) = id(nau_raw).state;'
-
-
-output:
-  - platform: gpio
-    pin: 13
-    id: blue_led
-
-light:
-  - platform: binary
-    name: "Blue LED"
-    output: blue_led
-    restore_mode: ALWAYS_OFF
+      
