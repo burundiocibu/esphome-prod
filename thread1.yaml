@@ -1,7 +1,7 @@
 substitutions:
   me: thread1
 
-# max vbuss voltate 6.5V
+# max vbuss voltage 6.5V
 esphome:
   name: ${me}
   comment: supermini esp32h2
@@ -16,6 +16,10 @@ external_components:
   - source: github://pr#11766
     components: [openthread]
     refresh: 1h
+  - source:
+      type: local
+      path: components
+    components: [nau7802_local]
 
 esp32:
   variant: ESP32H2
@@ -79,36 +83,16 @@ globals:
     restore_value: yes
     initial_value: "200000"
 
-interval:
-  - interval: 15s
-    then:
-      - lambda: |-
-          extern esp_err_t esp_pm_dump_locks(FILE* stream);
-          char buf[2048];
-          FILE *f = fmemopen(buf, sizeof(buf), "w");
-          if (f != nullptr) {
-            esp_pm_dump_locks(f);
-            fclose(f);
-            ESP_LOGI("pm_dump", "\n%s", buf);
-          }
-  - interval: 30s
-    then:
-      - switch.turn_on: sensor_power
-      - delay: 20ms
-      - component.update: nau_raw
-      - delay: 1s
-      - switch.turn_off: sensor_power  
-
 sensor:
   - platform: uptime
     name: ${me} uptime
     update_interval: 30s
 
-  - platform: nau7802
+  - platform: nau7802_local
     id: nau_raw
     gain: 128
     ldo_voltage: 3.0V
-    update_interval: never
+    update_interval: 30s
 
   - platform: template
     name: ${me} depth
@@ -147,10 +131,6 @@ switch:
         - logger.log: "Set Radio Off When Idle"
         - openthread.pollperiod: 30s
 
-  - platform: gpio
-    id: sensor_power
-    pin: 13
-        
 button:
   - platform: template
     name: "Tare"

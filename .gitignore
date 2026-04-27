@@ -10,3 +10,4 @@
 **/platformio.ini
 **/partitions.csv
 .cache
+**/.DS_Store
