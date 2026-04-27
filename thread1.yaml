@@ -93,6 +93,12 @@ sensor:
     gain: 128
     ldo_voltage: 3.0V
     update_interval: 30s
+    temperature:
+      name: ${me} nau-temp
+      id: nau_temp
+      filters:
+        - lambda: return (x - 291528.0f) / 549.7f;
+      accuracy_decimals: 2
 
   - platform: template
     name: ${me} depth

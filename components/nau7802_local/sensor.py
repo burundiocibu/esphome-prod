@@ -2,7 +2,15 @@ import esphome.codegen as cg
 from esphome.components import i2c, sensor
 from esphome.components.nau7802 import sensor as base_sensor
 import esphome.config_validation as cv
-from esphome.const import CONF_GAIN, CONF_ID, ICON_SCALE, STATE_CLASS_MEASUREMENT
+from esphome.const import (
+    CONF_GAIN,
+    CONF_ID,
+    CONF_TEMPERATURE,
+    DEVICE_CLASS_TEMPERATURE,
+    ICON_SCALE,
+    STATE_CLASS_MEASUREMENT,
+    UNIT_CELSIUS,
+)
 
 DEPENDENCIES = ["i2c"]
 AUTO_LOAD = ["nau7802"]
@@ -39,6 +47,12 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_GAIN_CALIBRATION, default=1.0): cv.float_range(
                 min=0, max=511.9999998807907
             ),
+            cv.Optional(CONF_TEMPERATURE): sensor.sensor_schema(
+                unit_of_measurement=UNIT_CELSIUS,
+                device_class=DEVICE_CLASS_TEMPERATURE,
+                accuracy_decimals=1,
+                state_class=STATE_CLASS_MEASUREMENT,
+            ),
         }
     )
     .extend(cv.polling_component_schema("60s"))
@@ -57,3 +71,7 @@ async def to_code(config):
     cg.add(var.set_gain(config[CONF_GAIN]))
     cg.add(var.set_gain_calibration(config[CONF_GAIN_CALIBRATION]))
     cg.add(var.set_offset_calibration(config[CONF_OFFSET_CALIBRATION]))
+
+    if temp_config := config.get(CONF_TEMPERATURE):
+        temp_sens = await sensor.new_sensor(temp_config)
+        cg.add(var.set_temperature_sensor(temp_sens))
