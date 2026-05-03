@@ -1,5 +1,6 @@
 substitutions:
   me: thread1
+  interval: 15s
 
 # max vbuss voltage 6.5V
 esphome:
@@ -19,7 +20,7 @@ external_components:
   - source:
       type: local
       path: components
-    components: [nau7802_local]
+    components: [nau7802_local, max17048]
 
 esp32:
   variant: ESP32H2
@@ -29,9 +30,8 @@ esp32:
       CONFIG_USJ_NO_AUTO_LS_ON_CONNECTION: n # doesn't seem to matter
 
 logger:
-  level: info
-  #hardware_uart: UART0
-  baud_rate: 0
+  level: DEBUG
+  #baud_rate: 0
 
 api:
   encryption:
@@ -49,21 +49,13 @@ openthread:
   device_type: MTD
   force_dataset: True
   output_power: 8dBm
-  poll_period: 30s
+  poll_period: ${interval}
   tlv: 0e080000000000010000000300000f4a0300001535060004001fffe00208d048b6c2bb035b310708fdc224ebeb1bd67f051031ef9e2d3d6fe3acff931e9e82bb14d2030e68612d7468726561642d313631620102161b0410625716294324d7a2013e2100d549ff0e0c0402a0f7f8
 
 i2c:
   sda: 14 # qwiic blue
   scl: 12 # qeiic yellow
-  frequency: 200kHz
-
-one_wire:
-  - platform: gpio
-    pin:
-      number: 11
-      mode:
-        input: true
-        pullup: true
+  frequency: 10kHz
 
 power_management:
   id: pm_id
@@ -85,42 +77,54 @@ globals:
 
 sensor:
   - platform: uptime
-    name: ${me} uptime
-    update_interval: 30s
+    name: uptime
+    update_interval: ${interval}
 
   - platform: nau7802_local
     id: nau_raw
+    name: nau-raw
     gain: 128
     ldo_voltage: 3.0V
-    update_interval: 30s
+    update_interval: ${interval}
     temperature:
-      name: ${me} nau-temp
-      id: nau_temp
-      filters:
-        - lambda: return (x - 291528.0f) / 549.7f;
+      id: nau_temp_raw
       accuracy_decimals: 2
 
   - platform: template
-    name: ${me} depth
-    id: depth
-    lambda: return 100 * (id(nau_raw).state - id(tare_count)) / (id(cal100_count) - id(tare_count));
+    name: nau-temp
+    id: nau_temp
+    device_class: temperature
+    unit_of_measurement: "°C"
+    lambda: |-
+      float x = id(nau_temp_raw).state;
+      return ((3.177731e-10f) * x + 7.689528e-04f) * x + -2.398036e+02f;
+    accuracy_decimals: 2
+    update_interval: ${interval}
+
+  - platform: template
+    id: nau_tc
+    lambda: |-
+      float T = id(nau_temp).state;
+      float T_ref = 30.3962f;
+      float raw_offset = (((4.799312e+01f) * T + -3.284368e+04f) * T + 5.168702e+05f) - (((4.799312e+01f) * T_ref + -3.284368e+04f) * T_ref + 5.168702e+05f);
+      return id(nau_raw).state - raw_offset;
+    update_interval: ${interval}
+
+  - platform: template
+    name: depth
+    device_class: distance
+    lambda: return 100.0f * (id(nau_tc).state - id(tare_count)) / (id(cal100_count) - id(tare_count));
     unit_of_measurement: mm
+    update_interval: ${interval}
     accuracy_decimals: 2
 
-  - platform: template
-    name: ${me} tare_count
-    lambda: return id(tare_count);
-
-  - platform: template
-    name: ${me} cal100_count
-    lambda: return id(cal100_count);
-
-  - platform: dallas_temp
-    address: 0xb302131afedcaa28
-    name: ${me} sg-temp
-    id: sg_temp
-    accuracy_decimals: 2
-
+  - platform: max17048
+    id: max17048_id
+    update_interval: ${interval}
+    battery_voltage:
+      name: "Battery Voltage"
+    battery_level:
+      name: "Battery"
 
 switch:
   - platform: template
@@ -135,21 +139,21 @@ switch:
     turn_off_action:
       then:
         - logger.log: "Set Radio Off When Idle"
-        - openthread.pollperiod: 30s
+        - openthread.pollperiod: ${interval}
 
 button:
   - platform: template
-    name: "Tare"
+    name: "0 mm Cal"
     on_press:
       - logger.log:
           format: "setting tare_count to %.1f"
           args: ['id(nau_raw).state']
-      - lambda: 'id(tare_count) = id(nau_raw).state;'
+      - lambda: 'id(tare_count) = id(nau_tc).state;'
   - platform: template
-    name: "200mm Cal"
+    name: "100 mm Cal"
     on_press:
       - logger.log:
           format: "setting cal100_count to %.1f"
           args: ['id(nau_raw).state']
-      - lambda: 'id(cal100_count) = id(nau_raw).state;'
+      - lambda: 'id(cal100_count) = id(nau_tc).state;'
       

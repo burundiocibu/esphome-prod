@@ -7,6 +7,7 @@ namespace nau7802_local {
 static const char *const TAG = "nau7802_local";
 
 static const uint8_t PU_CTRL_REG = 0x00;
+static const uint8_t PU_CTRL_POWERUP_DIGITAL = 0x02;
 static const uint8_t PU_CTRL_POWERUP_ANALOG = 0x04;
 static const uint8_t PU_CTRL_CYCLE_START = 0x10;
 
@@ -50,6 +51,13 @@ void NAU7802LocalSensor::update() {
   this->busy_ = true;
 
   i2c::I2CRegister pu_ctrl = this->reg(PU_CTRL_REG);
+  if (!(pu_ctrl.get() & PU_CTRL_POWERUP_DIGITAL)) {
+    ESP_LOGW(TAG, "Chip lost state (PUD=0); re-initializing");
+    nau7802::NAU7802Sensor::setup();
+    this->busy_ = false;
+    return;
+  }
+
   pu_ctrl |= PU_CTRL_POWERUP_ANALOG | PU_CTRL_CYCLE_START;
 
   this->set_timeout("nau7802_local_read", WAKE_DELAY_MS, [this]() {
