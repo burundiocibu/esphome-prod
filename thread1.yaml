@@ -54,8 +54,16 @@ openthread:
 
 i2c:
   sda: 14 # qwiic blue
-  scl: 12 # qeiic yellow
-  frequency: 10kHz
+  scl: 12 # qwiic yellow
+  frequency: 100kHz
+
+one_wire:
+  - platform: gpio
+    pin:
+      number: 11
+      mode:
+        input: true
+        pullup: true
 
 power_management:
   id: pm_id
@@ -88,6 +96,7 @@ sensor:
     update_interval: ${interval}
     temperature:
       id: nau_temp_raw
+      name: nau_temp_raw
       accuracy_decimals: 2
 
   - platform: template
@@ -104,9 +113,9 @@ sensor:
   - platform: template
     id: nau_tc
     lambda: |-
-      float T = id(nau_temp).state;
-      float T_ref = 30.3962f;
-      float raw_offset = (((4.799312e+01f) * T + -3.284368e+04f) * T + 5.168702e+05f) - (((4.799312e+01f) * T_ref + -3.284368e+04f) * T_ref + 5.168702e+05f);
+      float tr = id(nau_temp_raw).state;
+      float tr_ref = 314414.5f;
+      float raw_offset = (((1.344351e-04f) * tr + -1.113397e+02f) * tr + 2.092379e+07f) - (((1.344351e-04f) * tr_ref + -1.113397e+02f) * tr_ref + 2.092379e+07f);
       return id(nau_raw).state - raw_offset;
     update_interval: ${interval}
 
@@ -125,6 +134,13 @@ sensor:
       name: "Battery Voltage"
     battery_level:
       name: "Battery"
+
+  - platform: dallas_temp
+    address: 0xb302131afedcaa28
+    name: ${me} sg-temp
+    id: sg_temp
+    update_interval: ${interval}
+    accuracy_decimals: 2
 
 switch:
   - platform: template
