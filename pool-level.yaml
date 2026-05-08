@@ -83,6 +83,7 @@ sensor:
 
   - platform: nau7802_local
     id: nau_raw
+    name: nau_raw
     gain: 128
     ldo_voltage: 3.0V
     update_interval: never
