@@ -105,10 +105,8 @@ sensor:
   - platform: template
     id: nau_tc
     lambda: |-
-      float tr = id(nau_temp_raw).state;
-      float tr_ref = 314414.5f;
-      float raw_offset = (((1.344351e-04f) * tr + -1.113397e+02f) * tr + 2.092379e+07f) - (((1.344351e-04f) * tr_ref + -1.113397e+02f) * tr_ref + 2.092379e+07f);
-      return id(nau_raw).state - raw_offset;
+      float t = id(nau_temp).state;
+      return id(nau_raw).state - ((-3.421999e+04f) * t + 8.432991e+05f);
     update_interval: never
 
   - platform: template

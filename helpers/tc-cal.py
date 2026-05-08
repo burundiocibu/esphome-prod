@@ -17,10 +17,10 @@ pairing is reliable without an external temperature sensor.
 Assumption: all drift in nau_raw is due to temperature.
 
 The fitted correction is applied in pool-level.yaml as:
-    nau_tc = nau_raw - (f(nau_temp) - f(nau_temp_ref))
+    nau_tc = nau_raw - (poly(nau_temp) - poly(nau_temp_ref))
 
 Usage:
-    ./tc-cal.py <logfile> [--degree N] [--since HH:MM:SS]
+    ./tc-cal.py <logfile> [--degree N] [--lag SECONDS] [--since HH:MM:SS]
 """
 
 from __future__ import annotations
@@ -106,6 +106,10 @@ def main() -> None:
     df = parse_log(args.logfile)
     if args.since:
         cutoff = pd.to_timedelta(args.since)
+        # If the cutoff falls before the first sample the log has crossed midnight
+        # and the since time refers to the next day (timestamps were bumped by 1 day).
+        if not df.empty and cutoff < df["ts"].iloc[0]:
+            cutoff += pd.Timedelta(days=1)
         df = df[df["ts"] >= cutoff]
         if df.empty:
             sys.exit(f"error: no samples after {args.since}")
@@ -117,14 +121,15 @@ def main() -> None:
 
     temp = paired["temp"].to_numpy()
     raw = paired["raw"].to_numpy()
+    ts_sec = (paired["ts"] - paired["ts"].iloc[0]).dt.total_seconds().to_numpy()
     temp_ref = float(np.mean(temp))
     raw_ref = float(np.mean(raw))
 
     deg = args.degree
-    coeffs = np.polyfit(temp, raw, deg)
-    raw_fit = np.polyval(coeffs, temp)
+    poly_coeffs = np.polyfit(temp, raw, deg)
+    raw_fit = np.polyval(poly_coeffs, temp)
 
-    drift = raw_fit - float(np.polyval(coeffs, temp_ref))
+    drift = raw_fit - float(np.polyval(poly_coeffs, temp_ref))
     raw_corrected = raw - drift
 
     rmse_before = float(np.sqrt(np.mean((raw - raw_ref) ** 2)))
@@ -140,7 +145,7 @@ def main() -> None:
     labels_abc = "abcdefgh"
     terms = " + ".join(f"{l}*t^{deg-i}" if i < deg else l for i, l in enumerate(labels_abc[:deg+1]))
     print(f"Drift fit  nau_raw(t) = {terms}")
-    for i, coeff in enumerate(coeffs):
+    for i, coeff in enumerate(poly_coeffs):
         print(f"  {labels_abc[i]} = {coeff:.6e}")
     print()
     print(f"RMS count deviation before correction: {rmse_before:.1f}")
@@ -150,7 +155,7 @@ def main() -> None:
     out_png = args.logfile.with_stem(args.logfile.stem + lag_tag).with_suffix(".png")
     sort_idx = np.argsort(temp)
     t_sorted = temp[sort_idx]
-    fit_sorted = raw_fit[sort_idx]
+    fit_sorted = np.polyval(poly_coeffs, t_sorted)
 
     fig, axes = plt.subplots(3, 1, figsize=(10, 12))
     lag_label = f"  |  lag {args.lag:+.0f}s" if args.lag else ""
@@ -173,7 +178,6 @@ def main() -> None:
     ax1.set_title(f"Corrected vs temperature  (RMSE {rmse_after:.0f} counts)")
 
     ax2 = axes[2]
-    ts_sec = (paired["ts"] - paired["ts"].iloc[0]).dt.total_seconds().to_numpy()
     ax2.plot(ts_sec, raw, color="tab:blue", linewidth=1, alpha=0.7, label="nau_raw")
     ax2.plot(ts_sec, raw_corrected, color="tab:green", linewidth=1, alpha=0.7, label="nau_tc")
     ax2.set_ylabel("raw counts")
@@ -198,17 +202,13 @@ def main() -> None:
             expr = f"({expr}) * {var} + {c:.6e}f"
         return expr
 
-    poly_t = horner_expr("t", list(coeffs))
-    poly_t_ref = horner_expr("t_ref", list(coeffs))
+    poly_t = horner_expr("t", list(poly_coeffs))
 
     print()
     print(f"Suggested lambda for nau_tc in pool-level.yaml  [degree {deg}]:")
-
     print("  lambda: |-")
     print(f"    float t = id(nau_temp).state;")
-    print(f"    float t_ref = {temp_ref:.2f}f;")
-    print(f"    float raw_offset = ({poly_t}) - ({poly_t_ref});")
-    print(f"    return id(nau_raw).state - raw_offset;")
+    print(f"    return id(nau_raw).state - ({poly_t});")
 
 
 if __name__ == "__main__":
