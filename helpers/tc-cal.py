@@ -5,14 +5,14 @@
 #     "matplotlib",
 #     "numpy",
 #     "pandas",
+#     "requests",
 # ]
 # ///
 """Fit a temperature-compensation polynomial for nau_tc using nau-temp.
 
-Reads nau_raw and nau-temp from an ESPHome log captured during a
-temperature sweep with the sensor at a fixed physical depth. Both come from
-the same NAU7802 chip and are logged within a second of each other, so
-pairing is reliable without an external temperature sensor.
+Queries nau_raw and nau-temp from Prometheus. Both come from the same
+NAU7802 chip and are reported within a second of each other, so pairing
+is reliable without an external temperature sensor.
 
 Assumption: all drift in nau_raw is due to temperature.
 
@@ -20,63 +20,50 @@ The fitted correction is applied in pool-level.yaml as:
     nau_tc = nau_raw - (poly(nau_temp) - poly(nau_temp_ref))
 
 Usage:
-    ./tc-cal.py <logfile> [--degree N] [--lag SECONDS] [--since HH:MM:SS]
+    ./tc-cal.py [--start ISO] [--end ISO] [--degree N] [--lag SECONDS]
 """
 
 from __future__ import annotations
 
 import argparse
-import re
 import sys
-from pathlib import Path
+from datetime import datetime, timedelta, timezone
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import requests
 
-LINE_RE = re.compile(
-    r"^\[(?P<ts>\d{2}:\d{2}:\d{2}\.\d{3})\]"
-    r"(?:\x1b\[\d+(?:;\d+)*m|\[\d+(?:;\d+)*m)?"
-    r"\[S\]\[sensor\]:\s+"
-    r"'(?P<name>[^']+)'\s+>>\s+"
-    r"(?P<value>-?\d+(?:\.\d+)?|nan)"
-)
-
-WANTED = {"nau_raw", "nau-temp"}
+PROMETHEUS_URL = "http://duckling.groot:9090"
+NAU_RAW_METRIC = 'homeassistant_sensor_state{entity="sensor.pool_level_nau_raw"}'
+NAU_TEMP_METRIC = 'homeassistant_sensor_temperature_celsius{entity="sensor.pool_level_nau_temp"}'
+STEP = "15s"
 
 
-def parse_log(path: Path) -> pd.DataFrame:
-    rows: list[tuple[pd.Timedelta, str, float]] = []
-    with path.open() as f:
-        for line in f:
-            m = LINE_RE.match(line)
-            if not m:
-                continue
-            name = m.group("name")
-            if name not in WANTED:
-                continue
-            value = float(m.group("value"))
-            if np.isnan(value):
-                continue
-            ts = pd.to_timedelta(m.group("ts"))
-            rows.append((ts, name, value))
-
-    if not rows:
-        sys.exit("error: no nau_raw / nau-temp samples found in log")
-
-    df = pd.DataFrame(rows, columns=["ts", "name", "value"])
-    day = pd.Timedelta(days=1)
-    bumps = (df["ts"].diff() < pd.Timedelta(0)).cumsum()
-    df["ts"] = df["ts"] + bumps * day
-    return df
+def query_range(base_url: str, query: str, start: datetime, end: datetime) -> pd.DataFrame:
+    resp = requests.get(
+        f"{base_url}/api/v1/query_range",
+        params={"query": query, "start": start.timestamp(), "end": end.timestamp(), "step": STEP},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    if data["status"] != "success":
+        sys.exit(f"error: Prometheus query failed: {data.get('error', 'unknown')}")
+    results = data["data"]["result"]
+    if not results:
+        sys.exit(f"error: no data returned for query: {query}")
+    # Take the first matching series (there may be duplicates from old entities)
+    values = results[0]["values"]
+    df = pd.DataFrame(values, columns=["ts", "value"])
+    df["ts"] = pd.to_datetime(df["ts"].astype(float), unit="s", utc=True)
+    df["value"] = pd.to_numeric(df["value"], errors="coerce")
+    return df.dropna(subset=["value"])
 
 
-def pair_samples(df: pd.DataFrame, lag: float = 0.0) -> pd.DataFrame:
-    raw = df[df["name"] == "nau_raw"][["ts", "value"]].rename(columns={"value": "raw"})
-    temp = df[df["name"] == "nau-temp"][["ts", "value"]].rename(columns={"value": "temp"})
-
-    raw = raw.sort_values("ts").reset_index(drop=True)
-    temp = temp.sort_values("ts").reset_index(drop=True)
+def pair_samples(raw_df: pd.DataFrame, temp_df: pd.DataFrame, lag: float = 0.0) -> pd.DataFrame:
+    raw = raw_df.rename(columns={"value": "raw"}).sort_values("ts").reset_index(drop=True)
+    temp = temp_df.rename(columns={"value": "temp"}).sort_values("ts").reset_index(drop=True)
 
     # Shift temperature timestamps forward by lag seconds so that temp(t+lag)
     # is paired with raw(t) -- compensates for diode thermal lag behind the
@@ -91,29 +78,38 @@ def pair_samples(df: pd.DataFrame, lag: float = 0.0) -> pd.DataFrame:
     return paired
 
 
+def parse_dt(s: str) -> datetime:
+    dt = datetime.fromisoformat(s)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 def main() -> None:
+    now = datetime.now(tz=timezone.utc)
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("logfile", type=Path)
-    p.add_argument("--since", metavar="HH:MM:SS",
-                   help="ignore samples before this wall-clock time")
+    p.add_argument("--start", metavar="ISO", type=parse_dt,
+                   default=now - timedelta(hours=24),
+                   help="start of time range (default: 24 hours ago)")
+    p.add_argument("--end", metavar="ISO", type=parse_dt,
+                   default=now,
+                   help="end of time range (default: now)")
     p.add_argument("--degree", type=int, default=2, metavar="N",
                    help="polynomial degree for drift fit (default 2)")
     p.add_argument("--lag", type=float, default=0.0, metavar="SECONDS",
                    help="shift nau-temp timestamps forward by this many seconds to "
                         "compensate for diode thermal lag (can be negative)")
+    p.add_argument("--output", metavar="FILE", default=None,
+                   help="output PNG path (default: tc-cal[_lagXs].png)")
     args = p.parse_args()
 
-    df = parse_log(args.logfile)
-    if args.since:
-        cutoff = pd.to_timedelta(args.since)
-        # If the cutoff falls before the first sample the log has crossed midnight
-        # and the since time refers to the next day (timestamps were bumped by 1 day).
-        if not df.empty and cutoff < df["ts"].iloc[0]:
-            cutoff += pd.Timedelta(days=1)
-        df = df[df["ts"] >= cutoff]
-        if df.empty:
-            sys.exit(f"error: no samples after {args.since}")
-    paired = pair_samples(df, lag=args.lag)
+    print(f"querying {args.start.isoformat()} .. {args.end.isoformat()}")
+    raw_df = query_range(PROMETHEUS_URL, NAU_RAW_METRIC, args.start, args.end)
+    temp_df = query_range(PROMETHEUS_URL, NAU_TEMP_METRIC, args.start, args.end)
+    print(f"  nau_raw:  {len(raw_df)} samples")
+    print(f"  nau-temp: {len(temp_df)} samples")
+
+    paired = pair_samples(raw_df, temp_df, lag=args.lag)
 
     n = len(paired)
     if n < args.degree + 1:
@@ -136,6 +132,7 @@ def main() -> None:
     rmse_after = float(np.sqrt(np.mean((raw_corrected - raw_ref) ** 2)))
 
     lag_str = f"{args.lag:+.0f}s" if args.lag else "none"
+    print()
     print(f"samples paired:             {n}")
     print(f"temperature lag:            {lag_str}")
     print(f"nau-temp range (°C):        {temp.min():.2f} .. {temp.max():.2f}  (ref = {temp_ref:.2f})")
@@ -152,7 +149,7 @@ def main() -> None:
     print(f"RMS count deviation after  correction: {rmse_after:.1f}")
 
     lag_tag = f"_lag{args.lag:+.0f}s" if args.lag else ""
-    out_png = args.logfile.with_stem(args.logfile.stem + lag_tag).with_suffix(".png")
+    out_png = args.output or f"tc-cal{lag_tag}.png"
     sort_idx = np.argsort(temp)
     t_sorted = temp[sort_idx]
     fit_sorted = np.polyval(poly_coeffs, t_sorted)
