@@ -110,6 +110,20 @@ sensor:
     update_interval: never
 
   - platform: template
+    id: tare_count_sensor
+    name: tare count
+    lambda: return id(tare_count);
+    update_interval: never
+    accuracy_decimals: 0
+
+  - platform: template
+    id: cal100_count_sensor
+    name: cal100 count
+    lambda: return id(cal100_count);
+    update_interval: never
+    accuracy_decimals: 0
+
+  - platform: template
     id: depth_sensor
     name: depth
     lambda: return 100.0f * (id(nau_tc).state - id(tare_count)) / (id(cal100_count) - id(tare_count));
@@ -176,6 +190,8 @@ script:
             - component.update: nau_temp
             - component.update: nau_tc
             - component.update: depth_sensor
+            - component.update: tare_count_sensor
+            - component.update: cal100_count_sensor
             - component.update: max17048_id
             - delay: !lambda "return (uint32_t)(id(sensor_interval).state * 1000);"
 
@@ -187,6 +203,7 @@ button:
           format: "setting tare_count to %.1f"
           args: ['id(nau_raw).state']
       - lambda: 'id(tare_count) = id(nau_tc).state;'
+      - component.update: tare_count_sensor
   - platform: template
     name: "100 mm Cal"
     on_press:
@@ -194,4 +211,5 @@ button:
           format: "setting cal100_count to %.1f"
           args: ['id(nau_raw).state']
       - lambda: 'id(cal100_count) = id(nau_tc).state;'
+      - component.update: cal100_count_sensor
       
