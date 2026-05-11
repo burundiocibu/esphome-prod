@@ -64,17 +64,6 @@ power_management:
   power_down_peripherals: false
   profiling: true
 
-globals:
-  - id: tare_count
-    type: float
-    restore_value: yes
-    initial_value: "100000"
-
-  - id: cal100_count
-    type: float
-    restore_value: yes
-    initial_value: "200000"
-
 sensor:
   - platform: uptime
     id: uptime_sensor
@@ -103,30 +92,14 @@ sensor:
     update_interval: never
 
   - platform: template
-    id: nau_tc
-    lambda: |-
-      float t = id(nau_temp).state;
-      return id(nau_raw).state - ((-3.421999e+04f) * t + 8.432991e+05f);
-    update_interval: never
-
-  - platform: template
-    id: tare_count_sensor
-    name: tare count
-    lambda: return id(tare_count);
-    update_interval: never
-    accuracy_decimals: 0
-
-  - platform: template
-    id: cal100_count_sensor
-    name: cal100 count
-    lambda: return id(cal100_count);
-    update_interval: never
-    accuracy_decimals: 0
-
-  - platform: template
     id: depth_sensor
     name: depth
-    lambda: return 100.0f * (id(nau_tc).state - id(tare_count)) / (id(cal100_count) - id(tare_count));
+    lambda: |-
+      float t = id(nau_temp).state;
+      float r = id(nau_raw).state;
+      float zero = 2.02193e+06f + -141067.0f*t + 2290.6f*pow(t, 2);
+      float cal100 = 542179.0f + -80494.1f*t + 798.792f*pow(t, 2);
+      return 100.0f * (r - zero) / (cal100 - zero);
     unit_of_measurement: mm
     state_class: measurement
     update_interval: never
@@ -188,28 +161,7 @@ script:
             - component.update: uptime_sensor
             - component.update: nau_raw
             - component.update: nau_temp
-            - component.update: nau_tc
             - component.update: depth_sensor
-            - component.update: tare_count_sensor
-            - component.update: cal100_count_sensor
             - component.update: max17048_id
             - delay: !lambda "return (uint32_t)(id(sensor_interval).state * 1000);"
 
-button:
-  - platform: template
-    name: "0 mm Cal"
-    on_press:
-      - logger.log:
-          format: "setting tare_count to %.1f"
-          args: ['id(nau_raw).state']
-      - lambda: 'id(tare_count) = id(nau_tc).state;'
-      - component.update: tare_count_sensor
-  - platform: template
-    name: "100 mm Cal"
-    on_press:
-      - logger.log:
-          format: "setting cal100_count to %.1f"
-          args: ['id(nau_raw).state']
-      - lambda: 'id(cal100_count) = id(nau_tc).state;'
-      - component.update: cal100_count_sensor
-      
