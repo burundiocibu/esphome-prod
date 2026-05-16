@@ -94,7 +94,9 @@ def print_poly(poly: Polynomial, r2: float, label: str = "poly") -> None:
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--step", metavar="DURATION", default="15s", help="Prometheus query step (default: 15s)")
-    p.add_argument("--degree", metavar="N", type=int, default=1, help="polynomial degree for temperature compensation (default: 1)")
+    p.add_argument("--degree", metavar="N", type=int, default=1, help="polynomial degree for both fits (default: 1)")
+    p.add_argument("--zero-degree", metavar="N", type=int, default=None, help="polynomial degree for zero fit (overrides --degree)")
+    p.add_argument("--cal100-degree", metavar="N", type=int, default=None, help="polynomial degree for cal100 fit (overrides --degree)")
     p.add_argument(
         "--zero-span",
         metavar="ISO..ISO",
@@ -144,12 +146,13 @@ def _concat_spans(df: pd.DataFrame, spans: list[tuple[datetime, datetime]]) -> p
 def run_two_span(df: pd.DataFrame, args: argparse.Namespace) -> None:
     zspans: list[tuple[datetime, datetime]] = args.zero_span
     cspans: list[tuple[datetime, datetime]] = args.cal100_span
-    deg = args.degree
+    z_deg = args.zero_degree if args.zero_degree is not None else args.degree
+    c_deg = args.cal100_degree if args.cal100_degree is not None else args.degree
 
     zero_paired = _concat_spans(df, zspans)
     cal100_paired = _concat_spans(df, cspans)
 
-    for name, spans, region in (("zero", zspans, zero_paired), ("cal100", cspans, cal100_paired)):
+    for name, spans, region, deg in (("zero", zspans, zero_paired, z_deg), ("cal100", cspans, cal100_paired, c_deg)):
         if len(region) < deg + 2:
             sys.exit(f"{name} region: too few points ({len(region)}) across {len(spans)} span(s) for degree {deg} fit")
         print(
@@ -158,8 +161,8 @@ def run_two_span(df: pd.DataFrame, args: argparse.Namespace) -> None:
             f"raw mean={region['nau_raw'].mean():.0f}, σ={region['nau_raw'].std():.0f}"
         )
 
-    poly_zero, _, r2_zero = fit_poly(zero_paired, deg)
-    poly_cal100, _, r2_cal100 = fit_poly(cal100_paired, deg)
+    poly_zero, _, r2_zero = fit_poly(zero_paired, z_deg)
+    poly_cal100, _, r2_cal100 = fit_poly(cal100_paired, c_deg)
 
     print_poly(poly_zero, r2_zero, "zero")
     print_poly(poly_cal100, r2_cal100, "cal100")
@@ -253,7 +256,7 @@ def run_two_span(df: pd.DataFrame, args: argparse.Namespace) -> None:
         t_grid = np.linspace(float(t_all.min()), float(t_all.max()), 200)
         fig.add_trace(
             go.Scatter(
-                x=t_grid, y=poly_zero(t_grid), name=f"zero fit deg={deg} r²={r2_zero:.4f}", line=dict(color="blue", width=1.5)
+                x=t_grid, y=poly_zero(t_grid), name=f"zero fit deg={z_deg} r²={r2_zero:.4f}", line=dict(color="blue", width=1.5)
             ),
             row=3,
             col=1,
@@ -262,7 +265,7 @@ def run_two_span(df: pd.DataFrame, args: argparse.Namespace) -> None:
             go.Scatter(
                 x=t_grid,
                 y=poly_cal100(t_grid),
-                name=f"cal100 fit deg={deg} r²={r2_cal100:.4f}",
+                name=f"cal100 fit deg={c_deg} r²={r2_cal100:.4f}",
                 line=dict(color="green", width=1.5),
             ),
             row=3,

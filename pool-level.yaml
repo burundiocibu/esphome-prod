@@ -97,8 +97,8 @@ sensor:
     lambda: |-
       float t = id(nau_temp).state;
       float r = id(nau_raw).state;
-      float zero = 2.02193e+06f + -141067.0f*t + 2290.6f*pow(t, 2);
-      float cal100 = 542179.0f + -80494.1f*t + 798.792f*pow(t, 2);
+      float zero = -1.38003e+06 + -31348.4*t + 183.225*pow(t,2);
+      float cal100 = -1.49577e+06 + -166606*t + 6895.46*pow(t,2) + -97.8103*pow(t,3);
       return 100.0f * (r - zero) / (cal100 - zero);
     unit_of_measurement: mm
     state_class: measurement
