@@ -20,7 +20,7 @@ external_components:
   - source:
       type: local
       path: components
-    components: [nau7802_local, max17048]
+    components: [nau7802_local, max17048, openthread_rssi]
 
 esp32:
   variant: ESP32H2
@@ -69,6 +69,10 @@ sensor:
     id: uptime_sensor
     name: uptime
     update_interval: never
+
+  - platform: openthread_rssi
+    name: "Thread Parent RSSI"
+    update_interval: 30s
 
   - platform: nau7802_local
     id: nau_raw
