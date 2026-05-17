@@ -1,5 +1,5 @@
 substitutions:
-  me: thread1
+  me: tr1
 
 esphome:
   name: ${me}
@@ -34,7 +34,7 @@ openthread:
 sensor:
   - platform: uptime
     name: uptime
-    update_interval: 15s
+    update_interval: 5s
 
 text_sensor:
   - platform: openthread_info
@@ -44,17 +44,3 @@ text_sensor:
       name: "Thread Channel"
     role:
       name: "Thread Device Role"
-    rloc16:
-      name: "Thread RLOC16"
-    ext_addr:
-      name: "Thread Extended Address"
-    eui64:
-      name: "Thread EUI64"
-    network_name:
-      name: "Thread Network Name"
-    network_key:
-      name: "Thread Network Key"
-    pan_id:
-      name: "Thread PAN ID"
-    ext_pan_id:
-      name: "Thread Extended PAN ID"
