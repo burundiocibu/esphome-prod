@@ -101,7 +101,7 @@ sensor:
     lambda: |-
       float t = id(nau_temp).state;
       float r = id(nau_raw).state;
-      # cal data from 5/17-5/18 2026
+      // cal data from 5/17-5/18 2026
       float zero = -1.4522e+06 + -27501.6*t + 120.096*pow(t,2);
       float cal100 = -8.36035e+06 + 673066*t + -26249.3*pow(t,2) + 326.458*pow(t,3);
       return 100.0f * (r - zero) / (cal100 - zero);
