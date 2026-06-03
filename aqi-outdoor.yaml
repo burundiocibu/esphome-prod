@@ -19,7 +19,7 @@ openthread:
   device_type: FTD
   force_dataset: True
   output_power: 20dBm
-  tlv: 0e080000000000010000000300000f4a0300001535060004001fffe00208d048b6c2bb035b310708fdc224ebeb1bd67f051031ef9e2d3d6fe3acff931e9e82bb14d2030e68612d7468726561642d313631620102161b0410625716294324d7a2013e2100d549ff0e0c0402a0f7f8
+  tlv: !secret thread_tlv
 
 logger:
   level: info
@@ -55,6 +55,7 @@ switch:
   - platform: restart
     name: ${me} restart
 
+# Yes, 13 also drives the blue indicator.
 i2c:
   sda: GPIO13 # green & white
   scl: GPIO11 # blue
@@ -93,31 +94,31 @@ sensor:
     address: 0x69
     update_interval: 10s
     pm_1_0:
-      name: ${me} PM <1µm µg/m³
+      name: ${me} PM <1µm µg_m³
       id: ${meid}_PM_1_0
     pm_2_5:
-      name: ${me} PM <2.5µm µg/m³
+      name: ${me} PM <2.5µm µg_m³
       id: ${meid}_PM_2_5
     pm_4_0:
-      name: ${me} PM <4µm µg/m³
+      name: ${me} PM <4µm µg_m³
       id: ${meid}_PM_4_0
     pm_10_0:
-      name: ${me} PM <10µm µg/m³
+      name: ${me} PM <10µm µg_m³
       id: ${meid}_PM_10_0
     pmc_0_5:
-      name: ${me} PM <0.5µm #/cm³
+      name: ${me} PM <0.5µm cnt_cm³
       id: ${meid}_PMC_0_5
     pmc_1_0:
-      name: ${me} PM <1µm #/cm³
+      name: ${me} PM <1µm cnt_cm³
       id: ${meid}_PMC_1_0
     pmc_2_5:
-      name: ${me} PM <2.5µm #/cm³
+      name: ${me} PM <2.5µm cnt_cm³
       id: ${meid}_PMC_2_5
     pmc_4_0:
-      name: ${me} PM <4µm #/cm³
+      name: ${me} PM <4µm cnt_cm³
       id: ${meid}_PMC_4_0
     pmc_10_0:
-      name: ${me} PM <10µm #/cm³
+      name: ${me} PM <10µm cnt_cm³
       id: ${meid}_PMC_10_0
     pm_size:
       name: ${me} Typical Particle size
