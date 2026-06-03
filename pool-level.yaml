@@ -28,10 +28,8 @@ esp32:
     type: esp-idf
 
 logger:
-  level: INFO
+  level: DEBUG
   baud_rate: 0
-  logs:
-    sensor: WARN
 
 api:
   encryption:
@@ -50,7 +48,7 @@ openthread:
   force_dataset: True
   output_power: 12dBm
   poll_period: ${interval}
-  tlv: 0e080000000000010000000300000f4a0300001535060004001fffe00208d048b6c2bb035b310708fdc224ebeb1bd67f051031ef9e2d3d6fe3acff931e9e82bb14d2030e68612d7468726561642d313631620102161b0410625716294324d7a2013e2100d549ff0e0c0402a0f7f8
+  tlv: !secret thread_tlv
 
 i2c:
   sda: 14 # qwiic blue
@@ -101,10 +99,9 @@ sensor:
     lambda: |-
       float t = id(nau_temp).state;
       float r = id(nau_raw).state;
-      // cal data from 5/17-5/18 2026
-      float zero = -1.4522e+06 + -27501.6*t + 120.096*pow(t,2);
-      float cal100 = -8.36035e+06 + 673066*t + -26249.3*pow(t,2) + 326.458*pow(t,3);
-      return 100.0f * (r - zero) / (cal100 - zero);
+      float zero = 567346 + -204482*t + 4031.2*pow(t,2);
+      float cal100 = -2.1923e+06 + -20988.5*t + -168.027*pow(t,2);
+      return 100.0f * (r - zero) / (cal100 - zero);    
     unit_of_measurement: mm
     state_class: measurement
     update_interval: never
