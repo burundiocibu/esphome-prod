@@ -10,7 +10,7 @@ void OpenThreadNeighborLog::update() {
   if (!lock) {
     return;
   }
-  otInstance *instance = lock->get_instance();
+  otInstance *instance = lock.get_instance();
 
   otNeighborInfo info;
   otNeighborInfoIterator iterator = OT_NEIGHBOR_INFO_ITERATOR_INIT;
@@ -44,7 +44,7 @@ void ParentRssiSensor::update() {
     return;
   }
   int8_t rssi;
-  if (otThreadGetParentLastRssi(lock->get_instance(), &rssi) == OT_ERROR_NONE) {
+  if (otThreadGetParentLastRssi(lock.get_instance(), &rssi) == OT_ERROR_NONE) {
     this->publish_state(rssi);
   }
 }
