@@ -45,3 +45,8 @@ text_sensor:
 switch:
   - platform: restart
     name: ${me} restart
+
+sensor:
+  - platform: uptime
+    name: ${me} uptime
+    update_interval: 120s
