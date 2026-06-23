@@ -4,7 +4,7 @@ substitutions:
 
 esphome:
   name: ${me}
-  friendly_name: bessy-b
+  friendly_name: ${me}
   comment: supermini esp32h2
 
 esp32:
