@@ -37,6 +37,11 @@ external_components:
       path: components
     components: [openthread_rssi]
 
+i2c:
+  sda: 14 # qwiic green
+  scl: 12 # qwiic yellow
+  frequency: 100kHz
+
 openthread_rssi:
   update_interval: 5s
 
