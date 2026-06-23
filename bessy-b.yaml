@@ -20,6 +20,8 @@ api:
 
 ota:
   - platform: esphome
+    password: !secret esp_ota_pw
+    id: my_ota
 
 wifi:
   ssid: !secret wifi_ssid
