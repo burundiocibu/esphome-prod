@@ -1,0 +1,29 @@
+# Board: Generic ESP32 Board (Generic)
+# Definition: definitions/boards/generic-esp32/manifest.yaml
+
+esphome:
+  name: bessy-b
+  friendly_name: bessy-b
+
+esp32:
+  variant: esp32
+  framework:
+    type: esp-idf
+
+logger:
+
+api:
+  encryption:
+    key: "P1DKZ6SfnrHBxEIsYfTpP1793HVARwO8u/yBj8hLcEo="
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: bessy-b Fallback Hotspot
+    password: "n84gt5ei4aAb"
+
+captive_portal:
