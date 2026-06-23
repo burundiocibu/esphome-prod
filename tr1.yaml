@@ -43,7 +43,7 @@ i2c:
   frequency: 100kHz
 
 openthread_rssi:
-  update_interval: 5s
+  update_interval: 15s
 
 sensor:
   - platform: uptime
@@ -52,7 +52,7 @@ sensor:
     
   - platform: max17048
     id: max17048_id
-    update_interval: never
+    update_interval: 60s
     battery_voltage:
       name: "Battery Voltage"
     battery_level:
