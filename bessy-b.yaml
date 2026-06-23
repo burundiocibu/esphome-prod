@@ -37,3 +37,11 @@ web_server:
   version: 3
 
 prometheus:
+
+text_sensor:
+  - platform: version
+    name: ${me} ESPHome Version
+
+switch:
+  - platform: restart
+    name: ${me} restart
