@@ -35,7 +35,7 @@ external_components:
   - source:
       type: local
       path: components
-    components: [openthread_rssi]
+    components: [max17048, openthread_rssi]
 
 i2c:
   sda: 14 # qwiic green
