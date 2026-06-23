@@ -49,6 +49,14 @@ sensor:
   - platform: uptime
     name: uptime
     update_interval: 5s
+    
+  - platform: max17048
+    id: max17048_id
+    update_interval: never
+    battery_voltage:
+      name: "Battery Voltage"
+    battery_level:
+      name: "Battery"
 
 text_sensor:
   - platform: openthread_info
