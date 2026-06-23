@@ -45,8 +45,23 @@ text_sensor:
 switch:
   - platform: restart
     name: ${me} restart
+  - platform: gpio
+    pin: GPIO32
+    name: "Relay 1"
+  - platform: gpio
+    pin: GPIO33
+    name: "Relay 2"
+  - platform: gpio
+    pin: GPIO25
+    name: "Relay 3"
+  - platform: gpio
+    pin: GPIO26
+    name: "Relay 4"
 
 sensor:
   - platform: uptime
     name: ${me} uptime
     update_interval: 120s
+
+status_led:
+  pin: GPIO23
