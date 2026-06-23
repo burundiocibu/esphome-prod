@@ -5,7 +5,7 @@ substitutions:
 esphome:
   name: ${me}
   friendly_name: ${me}
-  comment: supermini esp32h2
+  comment: esp32-relay4
 
 esp32:
   variant: esp32
