@@ -1,9 +1,11 @@
-# Board: Generic ESP32 Board (Generic)
-# Definition: definitions/boards/generic-esp32/manifest.yaml
+substitutions:
+  me: "bessy-b"
+  meid: "bessy-b"
 
 esphome:
-  name: bessy-b
+  name: ${me}
   friendly_name: bessy-b
+  comment: supermini esp32h2
 
 esp32:
   variant: esp32
