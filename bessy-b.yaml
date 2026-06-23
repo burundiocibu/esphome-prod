@@ -31,3 +31,9 @@ wifi:
     password: "n84gt5ei4aAb"
 
 captive_portal:
+
+web_server:
+  port: 80
+  version: 3
+
+prometheus:
