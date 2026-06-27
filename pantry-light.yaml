@@ -61,7 +61,7 @@ output:
 
   - platform: gpio
     id: relay
-    pin: GPIO3 # GPIO12
+    pin: GPIO12
 
 light:
   - platform: binary
