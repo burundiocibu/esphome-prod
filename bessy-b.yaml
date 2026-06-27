@@ -2,12 +2,37 @@ substitutions:
   me: "bessy-b"
   meid: "bessy-b"
 
+  # ---- pin map (matches the wiring table) ----
+  pin_spi_clk:  GPIO18
+  pin_spi_miso: GPIO19
+  pin_spi_mosi: GPIO27
+  pin_tft_cs:   GPIO4
+  pin_tft_dc:   GPIO14
+  pin_tft_rst:  GPIO13
+  pin_tft_bl:   GPIO5
+  pin_rtd_cs:   GPIO16
+  pin_tc_cs:    GPIO17
+  pin_i2c_sda:  GPIO21
+  pin_i2c_scl:  GPIO22
+  pin_analog:   GPIO34
+  pin_enc_a:    GPIO35
+  pin_enc_b:    GPIO39
+  pin_enc_sw:   GPIO36
+  pin_ctc_int:  GPIO10
+  pin_ctc_rst:  GPIO11
+  pin_relay1:   GPIO32
+  pin_relay2:   GPIO33
+  pin_relay3:   GPIO25
+  pin_relay4:   GPIO26
+  pin_status:   GPIO23
+
 esphome:
   name: ${me}
   friendly_name: ${me}
   comment: esp32-relay4
 
 esp32:
+  board: esp32dev
   variant: esp32
   framework:
     type: esp-idf
@@ -38,30 +63,156 @@ web_server:
 
 prometheus:
 
+# ===================== Buses =====================
+spi:
+  clk_pin: ${pin_spi_clk}
+  miso_pin: ${pin_spi_miso}
+  mosi_pin: ${pin_spi_mosi}
+
+i2c:
+  sda: ${pin_i2c_sda}
+  scl: ${pin_i2c_scl}
+  scan: true
+
+# ===================== Display =====================
+output:
+  - platform: ledc
+    pin: ${pin_tft_bl}
+    id: tft_backlight
+
+light:
+  - platform: monochromatic
+    name: "Display Backlight"
+    output: tft_backlight
+    restore_mode: ALWAYS_ON
+
+font:
+  - file: "gfonts://Roboto"
+    id: roboto
+    size: 22
+
+display:
+  - platform: mipi_spi
+    model: ST7796
+    invert_colors: true
+    cs_pin: ${pin_tft_cs}
+    dc_pin: ${pin_tft_dc}
+    reset_pin: ${pin_tft_rst}
+    update_interval: 1s
+    lambda: |-
+      auto black = Color(0, 0, 0);
+      auto white = Color(255, 255, 255);
+      it.filled_rectangle(0,   0, 320, 34, black); it.printf(10,  10, id(roboto), white, "RTD: %.1f C",  id(rtd_temp).state);
+      it.filled_rectangle(0,  34, 320, 34, black); it.printf(10,  44, id(roboto), white, "TC : %.1f C",  id(tc_temp).state);
+      it.filled_rectangle(0,  68, 320, 34, black); it.printf(10,  78, id(roboto), white, "AIN: %.3f V",  id(analog_in).state);
+      it.filled_rectangle(0, 110, 320, 34, black); it.printf(10, 124, id(roboto), white, "A0: %.3f V",   id(ads_a0).state);
+      it.filled_rectangle(0, 144, 320, 34, black); it.printf(10, 158, id(roboto), white, "A1: %.3f V",   id(ads_a1).state);
+      it.filled_rectangle(0, 178, 320, 34, black); it.printf(10, 192, id(roboto), white, "A2: %.3f V",   id(ads_a2).state);
+      it.filled_rectangle(0, 212, 320, 34, black); it.printf(10, 226, id(roboto), white, "A3: %.3f V",   id(ads_a3).state);
+
+# ADS1115 hub (default address; ADDR->GND = 0x48)
+ads1115:
+  - address: 0x48
+
+
+# ===================== Sensors =====================
 text_sensor:
   - platform: version
     name: ${me} ESPHome Version
-
-switch:
-  - platform: restart
-    name: ${me} restart
-  - platform: gpio
-    pin: GPIO32
-    name: "Relay 1"
-  - platform: gpio
-    pin: GPIO33
-    name: "Relay 2"
-  - platform: gpio
-    pin: GPIO25
-    name: "Relay 3"
-  - platform: gpio
-    pin: GPIO26
-    name: "Relay 4"
 
 sensor:
   - platform: uptime
     name: ${me} uptime
     update_interval: 120s
 
-status_led:
-  pin: GPIO23
+  # MAX31865 RTD amplifier (PT100). For PT1000 use 4300 / 1000.
+  - platform: max31865
+    name: "RTD Temperature"
+    id: rtd_temp
+    cs_pin: ${pin_rtd_cs}
+    reference_resistance: 430 Ω
+    rtd_nominal_resistance: 100 Ω
+    rtd_wires: 3
+    update_interval: 5s
+
+  # MAX31855 thermocouple (read-only on SPI; no MOSI needed)
+  - platform: max31855
+    name: "Thermocouple Temperature"
+    id: tc_temp
+    cs_pin: ${pin_tc_cs}
+    update_interval: 5s
+
+  # ADS1115 — four single-ended channels (A0..A3 referenced to GND).
+  - platform: ads1115
+    name: "ADS1115 A0"
+    id: ads_a0
+    multiplexer: A0_GND
+    gain: 6.144
+    update_interval: 5s
+  - platform: ads1115
+    name: "ADS1115 A1"
+    id: ads_a1
+    multiplexer: A1_GND
+    gain: 6.144
+    update_interval: 5s
+  - platform: ads1115
+    name: "ADS1115 A2"
+    id: ads_a2
+    multiplexer: A2_GND
+    gain: 6.144
+    update_interval: 5s
+  - platform: ads1115
+    name: "ADS1115 A3"
+    id: ads_a3
+    multiplexer: A3_GND
+    gain: 6.144
+    update_interval: 5s
+
+  # On-chip ADC1 analog sensor
+  - platform: adc
+    name: "Analog Sensor"
+    id: analog_in
+    pin: ${pin_analog}
+    attenuation: 12db
+    update_interval: 5s
+
+  # Rotary encoder — input-only pins, EXTERNAL pull-ups required (no internal)
+  - platform: rotary_encoder
+    name: "Encoder"
+    id: encoder
+    pin_a:
+      number: ${pin_enc_a}
+      mode:
+        input: true
+    pin_b:
+      number: ${pin_enc_b}
+      mode:
+        input: true
+
+# ===================== Inputs =====================
+binary_sensor:
+  - platform: gpio
+    name: "Encoder Button"
+    pin:
+      number: ${pin_enc_sw}
+      mode:
+        input: true
+      inverted: true
+
+# ===================== Relays + LED =====================
+switch:
+  - platform: restart
+    name: ${me} restart
+  - platform: gpio
+    name: "Fan"
+    pin: ${pin_relay1}
+  - platform: gpio
+    name: "Auger"
+    pin: ${pin_relay2}
+  - platform: gpio
+    name: "Igniter"
+    pin: ${pin_relay3}
+  - platform: gpio
+    name: "Relay 4"
+    pin: ${pin_relay4}
+
