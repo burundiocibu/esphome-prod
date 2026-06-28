@@ -18,8 +18,8 @@ substitutions:
   pin_enc_a:    GPIO35
   pin_enc_b:    GPIO39
   pin_enc_sw:   GPIO36
-  pin_ctc_int:  GPIO10
-  pin_ctc_rst:  GPIO11
+  pin_ctc_int:  GPIO23
+  pin_ctc_rst:  GPIO12
   pin_relay1:   GPIO32
   pin_relay2:   GPIO33
   pin_relay3:   GPIO25
@@ -38,6 +38,7 @@ esp32:
     type: esp-idf
 
 logger:
+  level: INFO
 
 api:
   encryption:
@@ -77,7 +78,9 @@ i2c:
 # ===================== Display =====================
 output:
   - platform: ledc
-    pin: ${pin_tft_bl}
+    pin:
+      number: ${pin_tft_bl}
+      ignore_strapping_warning: true
     id: tft_backlight
 
 light:
@@ -93,22 +96,51 @@ font:
 
 display:
   - platform: mipi_spi
+    id: my_display
     model: ST7796
-    invert_colors: true
+    rotation: 270
     cs_pin: ${pin_tft_cs}
     dc_pin: ${pin_tft_dc}
     reset_pin: ${pin_tft_rst}
     update_interval: 1s
+    invert_colors: true
     lambda: |-
-      auto black = Color(0, 0, 0);
-      auto white = Color(255, 255, 255);
-      it.filled_rectangle(0,   0, 320, 34, black); it.printf(10,  10, id(roboto), white, "RTD: %.1f C",  id(rtd_temp).state);
-      it.filled_rectangle(0,  34, 320, 34, black); it.printf(10,  44, id(roboto), white, "TC : %.1f C",  id(tc_temp).state);
-      it.filled_rectangle(0,  68, 320, 34, black); it.printf(10,  78, id(roboto), white, "AIN: %.3f V",  id(analog_in).state);
-      it.filled_rectangle(0, 110, 320, 34, black); it.printf(10, 124, id(roboto), white, "A0: %.3f V",   id(ads_a0).state);
-      it.filled_rectangle(0, 144, 320, 34, black); it.printf(10, 158, id(roboto), white, "A1: %.3f V",   id(ads_a1).state);
-      it.filled_rectangle(0, 178, 320, 34, black); it.printf(10, 192, id(roboto), white, "A2: %.3f V",   id(ads_a2).state);
-      it.filled_rectangle(0, 212, 320, 34, black); it.printf(10, 226, id(roboto), white, "A3: %.3f V",   id(ads_a3).state);
+      auto fg = Color(0, 0, 0);        // black in buffer → white on screen (panel inverts)
+      auto bg = Color(255, 255, 255);   // white in buffer → black on screen (panel inverts)
+      it.fill(bg);
+      it.printf(10,  10, id(roboto), fg, "RTD: %.1f C",  id(rtd_temp).state);
+      it.printf(10,  44, id(roboto), fg, "TC : %.1f C",  id(tc_temp).state);
+      it.printf(10,  78, id(roboto), fg, "AIN: %.3f V",  id(analog_in).state);
+      it.printf(10, 124, id(roboto), fg, "A0: %.3f V",   id(ads_a0).state);
+      it.printf(10, 158, id(roboto), fg, "A1: %.3f V",   id(ads_a1).state);
+      it.printf(10, 192, id(roboto), fg, "A2: %.3f V",   id(ads_a2).state);
+      it.printf(10, 226, id(roboto), fg, "A3: %.3f V",   id(ads_a3).state);
+      if (id(touch_x) >= 0)
+        it.printf(10, 260, id(roboto), fg, "Touch: %d, %d", id(touch_x), id(touch_y));
+      else
+        it.printf(10, 260, id(roboto), fg, "Touch: ---");
+
+globals:
+  - id: touch_x
+    type: int
+    initial_value: "-1"
+  - id: touch_y
+    type: int
+    initial_value: "-1"
+
+touchscreen:
+  - platform: ft63x6
+    id: my_touch
+    interrupt_pin: ${pin_ctc_int}
+    reset_pin:
+      number: ${pin_ctc_rst}
+      ignore_strapping_warning: true
+    on_touch:
+      - lambda: |-
+          ESP_LOGI("touch", "Touch at x=%d, y=%d", touch.x, touch.y);
+          id(touch_x) = touch.x;
+          id(touch_y) = touch.y;
+          id(my_display).update();
 
 # ADS1115 hub (default address; ADDR->GND = 0x48)
 ads1115:

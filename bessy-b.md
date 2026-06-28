@@ -24,7 +24,7 @@ ADS1115 4 chan, 16 bit ADC, I2C, https://esphome.io/components/sensor/ads1115/
 | 3V3  | A      |                  | 3.3VDC | Orange | 3   | |
 | 5V   | B      |                  | 5VDC   | Red    | 5   | |
 | 18   | B      | SPI bus (shared) | SCLK   | Yellow | 7   | to all 3 SPI devices |
-| 19   | B      | SPI bus (shared) | MISO   | Green  | 8   | TFT doesn't use it; fine |
+| 19   | B      | SPI bus (shared) | MISO   | Green  | 8   | TFT doesn't use it;   fine |
 | 27   | A      | SPI bus (shared) | MOSI   | Blue   | 9   | MAX31855 doesn't use it; fine |
 | 4    | B      | ST7796U (TFT)    | CS     | Grey   | 10  | |
 | 14   | A      | ST7796U (TFT)    | RS     | Violet | 11  | |
@@ -38,8 +38,8 @@ ADS1115 4 chan, 16 bit ADC, I2C, https://esphome.io/components/sensor/ads1115/
 | 35   | A      | Rotary encoder   | A      | Grey   | 19  | ext 10k pull-up to 3V3 |
 | 39 (SVN) | A  | Rotary encoder   | B      | Brown  | 20  | ext 10k pull-up to 3V3 |
 | 36 (SVP) | A  | Rotary encoder   | SW     | Yellow | 21  | ext 10k pull-up to 3V3 |
-| 10   | A      | FT6336U (CTP)    | INT    | White  | 25  | |
-| 11   | A      | FT6336U (CTP)    | RST    | Violet | 26  | |
+| 23   | A      | FT6336U (CTP)    | INT    | White  | 25  | |
+| 12   | A      | FT6336U (CTP)    | RST    | Violet | 26  | strapping pin; ok as output after boot |
 
 Row is the labeled row on the interposer board
 
