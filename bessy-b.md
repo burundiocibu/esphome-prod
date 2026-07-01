@@ -30,7 +30,7 @@ ADS1115 4 chan, 16 bit ADC, I2C, https://esphome.io/components/sensor/ads1115/
 | 14   | A      | ST7796U (TFT)    | RS     | Violet | 11  | |
 | 13   | A      | ST7796U (TFT)    | RST    | Brown  | 12  | |
 | 5    | B      | ST7796U (TFT)    | BL     | White  | 13  | tie to 3V3 if no PWM dimming |
-| 16   | B      | MAX31865 (RTD)   | CS     | Orange | 14  | |
+| 16   | B      | unused           | CS     | Orange | 14  | |
 | 17   | B      | MAX31855 (TC)    | CS     | Violet | 15  | |
 | 21   | B      | ADS1115 (I²C)    | SDA    | Blue   | 16  | 4.7k pull-up to 3V3 |
 | 22   | B      | ADS1115 (I²C)    | SCL    | Green  | 17  | 4.7k pull-up to 3V3 |
