@@ -297,11 +297,20 @@ sensor:
 
   # On-chip ADC1 analog sensor
   - platform: adc
-    name: "Igniter Current"
-    id: igniter_current
+    id: adc1
     pin: ${pin_analog}
-    attenuation: 12db
+    attenuation: 0db
+  
+  - platform: ct_clamp
+    sensor: adc1
+    name: "Igniter Power"
+    sample_duration: 4s
     update_interval: 5s
+    unit_of_measurement: W
+    filters:
+      - calibrate_linear:
+          - 0 -> 0
+          - 0.33 -> 60
 
   # Rotary encoder — input-only pins, EXTERNAL pull-ups required (no internal)
   - platform: rotary_encoder
