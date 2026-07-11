@@ -44,23 +44,23 @@ sensor:
     channel_1:
       shunt_resistance: 0.1 ohm
       current:
-        name: "Ch 1 Current"
+        name: "Battery Current"
       power:
-        name: "Ch 1 Power"
+        name: "Battery Power"
       bus_voltage:
-        name: "Ch 1 Bus Voltage"
+        name: "Battery Bus Voltage"
       shunt_voltage:
-        name: "Ch 1 Shunt Voltage"
+        name: "Battery Shunt Voltage"
     channel_2:
       shunt_resistance: 0.1 ohm
       current:
-        name: "Ch 2 Current"
+        name: "Solar Current"
       power:
-        name: "Ch 2 Power"
+        name: "Solar Power"
       bus_voltage:
-        name: "Ch 2 Bus Voltage"
+        name: "Solar Bus Voltage"
       shunt_voltage:
-        name: "Ch 2 Shunt Voltage"
+        name: "Solar Shunt Voltage"
     update_interval: 30s
 
 
