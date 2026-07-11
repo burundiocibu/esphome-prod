@@ -34,21 +34,6 @@ sensor:
     name: ${me} uptime
     update_interval: 120s
 
-output:
-  - platform: ledc
-    id: pina
-    pin: GPIO23
-    frequency: 500
-  - platform: ledc
-    id: pinb
-    pin: GPIO16
-    frequency: 500
-
-light:
-  - platform: hbridge
-    name: ${me} lights
-    pin_a: pina
-    pin_b: pinb
 
   
     
