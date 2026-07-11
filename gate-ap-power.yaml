@@ -28,6 +28,7 @@ wifi:
 prometheus:
     
 web_server:
+  version: 3
 
 i2c:
   scl: 23 # green
