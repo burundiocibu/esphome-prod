@@ -48,9 +48,7 @@ sensor:
       power:
         name: "Battery Power"
       bus_voltage:
-        name: "Battery Bus Voltage"
-      shunt_voltage:
-        name: "Battery Shunt Voltage"
+        name: "Battery Voltage"
     channel_2:
       shunt_resistance: 0.1 ohm
       current:
@@ -58,9 +56,7 @@ sensor:
       power:
         name: "Solar Power"
       bus_voltage:
-        name: "Solar Bus Voltage"
-      shunt_voltage:
-        name: "Solar Shunt Voltage"
+        name: "Solar Voltage"
     update_interval: 30s
 
 
