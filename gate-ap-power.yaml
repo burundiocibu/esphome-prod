@@ -1,5 +1,5 @@
 substitutions:
-  me: oak-fae
+  me:   gate-ap-power
 
 esphome:
   name: ${me}
@@ -25,6 +25,8 @@ wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
 
+prometheus:
+    
 web_server:
 
 sensor:
