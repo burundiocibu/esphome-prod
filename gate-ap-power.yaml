@@ -29,10 +29,32 @@ prometheus:
     
 web_server:
 
+i2c:
+  scl: 1
+  sda: 2
+  
 sensor:
   - platform: uptime
     name: ${me} uptime
     update_interval: 120s
+
+  - platform: ina3221
+    address: 0x40
+    channel_1:
+      shunt_resistance: 0.1 ohm
+      current:
+        name: "INA3221 Channel 1 Current"
+      power:
+        name: "INA3221 Channel 1 Power"
+      bus_voltage:
+        name: "INA3221 Channel 1 Bus Voltage"
+      shunt_voltage:
+        name: "INA3221 Channel 1 Shunt Voltage"
+    channel_2:
+      # ...
+    channel_3:
+      # ...
+    update_interval: 60s
 
 
   
