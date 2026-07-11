@@ -11,7 +11,6 @@ substitutions:
   pin_tft_rst:  GPIO13
   pin_tft_bl:   GPIO5
   pin_rtd_cs:   GPIO16
-  pin_tc_cs:    GPIO17
   pin_i2c_sda:  GPIO21
   pin_i2c_scl:  GPIO22
   pin_analog:   GPIO34
@@ -52,7 +51,7 @@ esp32:
     type: esp-idf
 
 logger:
-  level: INFO
+  level: DEBUG
 
 api:
   encryption:
@@ -165,15 +164,15 @@ sensor:
     name: ${me} uptime
     update_interval: 120s
 
-  # MAX31855 thermocouple (read-only on SPI; no MOSI needed)
-  - platform: max31855
-    name: "Pot Temperature"
-    id: pot_temp
-    cs_pin: ${pin_tc_cs}
-    reference_temperature:
+  # MCP9600 thermocouple amp on shared I2C bus (MAX31855 SPI didn't play nice with the display)
+  - platform: mcp9600
+    update_interval: 5s
+    hot_junction:
+      name: "Pot Temperature"
+      id: pot_temp
+    cold_junction:
       id: tc_ref_temp
       name: tc_ref_temp
-    update_interval: 5s
 
   # ADS1115 — four single-ended channels (A0..A3 referenced to GND).
   # A0-A2: 100kΩ NTC thermistors via 47kΩ bias resistor (3.3V → 47kΩ → node → NTC → GND)
