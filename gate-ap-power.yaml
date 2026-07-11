@@ -43,17 +43,23 @@ sensor:
     channel_1:
       shunt_resistance: 0.1 ohm
       current:
-        name: "INA3221 Channel 1 Current"
+        name: "Ch 1 Current"
       power:
-        name: "INA3221 Channel 1 Power"
+        name: "Ch 1 Power"
       bus_voltage:
-        name: "INA3221 Channel 1 Bus Voltage"
+        name: "Ch 1 Bus Voltage"
       shunt_voltage:
-        name: "INA3221 Channel 1 Shunt Voltage"
+        name: "Ch 1 Shunt Voltage"
     channel_2:
-      # ...
-    channel_3:
-      # ...
+      shunt_resistance: 0.1 ohm
+      current:
+        name: "Ch 2 Current"
+      power:
+        name: "Ch 2 Power"
+      bus_voltage:
+        name: "Ch 2 Bus Voltage"
+      shunt_voltage:
+        name: "Ch 2 Shunt Voltage"
     update_interval: 60s
 
 
