@@ -30,8 +30,8 @@ prometheus:
 web_server:
 
 i2c:
-  scl: 5 # green
-  sda: 4 # blue
+  scl: 23 # green
+  sda: 22 # blue
   
 sensor:
   - platform: uptime
