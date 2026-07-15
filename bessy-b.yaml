@@ -50,7 +50,13 @@ esp32:
     type: esp-idf
 
 logger:
-  level: INFO
+  # DEBUG so text_sensor state changes (status_msg, etc.) are compiled in and visible.
+  level: DEBUG
+  logs:
+    sensor: NONE            # sensor state ('name >> value') is VERBOSE; DEBUG build already drops it
+    ads1115.sensor: NONE    # 'Got Voltage=...' per-conversion debug
+    ct_clamp: NONE          # 'Raw AC Value: ...' per-sample debug
+    text_sensor: DEBUG      # keep text-sensor state changes visible
 
 globals:
   # Timestamp (millis) of the last user input; drives the Asleep inactivity timeout.
@@ -61,6 +67,18 @@ globals:
   # Timestamp (millis) of the last wake; a brief grace window after this swallows
   # the extra encoder detents that a single wake gesture emits.
   - id: wake_lockout_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  # Latched when the firepot fails to light / dies. Suppresses the normal status
+  # messages so the display keeps showing "Safe Mode"; cleared when the system is
+  # (re)started via the go switch.
+  - id: in_safe_mode
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  # Timestamp (millis) the pot first dropped below the lit threshold during heating.
+  - id: pot_below_since_ms
     type: uint32_t
     restore_value: no
     initial_value: '0'
@@ -440,11 +458,11 @@ switch:
           then:
             - logger.log: "Smoker is still hot, keeping fan on"
             - switch.turn_on: fan
-            - lambda: id(status_msg).publish_state("Cooling down");
+            - lambda: if (!id(in_safe_mode)) id(status_msg).publish_state("Cooling down");
             - script.execute: sc_shutdown
           else:
             - script.stop: sc_shutdown
-            - lambda: id(status_msg).publish_state("Ready");
+            - lambda: if (!id(in_safe_mode)) id(status_msg).publish_state("Ready");
   - platform: gpio
     name: "Auger"
     id: auger
@@ -464,13 +482,14 @@ switch:
     optimistic: true
     on_turn_on:
       - logger.log: "System turned ON"
+      - lambda: id(in_safe_mode) = false;   # a fresh start clears any latched safe mode
       - script.execute: sc_pid_control
       - switch.turn_on: fan
       - script.execute: sc_light_pot
     on_turn_off:
       - logger.log: "System turned OFF"
       - script.execute: sc_stop_all_smoking
-      - lambda: id(status_msg).publish_state("Turned OFF");
+      - lambda: if (!id(in_safe_mode)) id(status_msg).publish_state("Turned OFF");
       - switch.turn_off: fan
 
 # ===================== PID control (ported from Traeger-D1) =====================
@@ -627,6 +646,32 @@ number:
     mode: box
     icon: mdi:sleep
 
+  - platform: template
+    name: "Firepot Lit Threshold"
+    id: pot_lit_threshold
+    min_value: 100
+    max_value: 500
+    step: 5
+    initial_value: 300
+    optimistic: true
+    restore_value: true
+    unit_of_measurement: "°F"
+    mode: box
+    icon: mdi:fire
+
+  - platform: template
+    name: "Firepot Fail Timeout"
+    id: firepot_fail_timeout
+    min_value: 60
+    max_value: 1200
+    step: 30
+    initial_value: 300
+    optimistic: true
+    restore_value: true
+    unit_of_measurement: "s"
+    mode: box
+    icon: mdi:fire-alert
+
 script:
   - id: sc_light_pot
     mode: single
@@ -655,14 +700,21 @@ script:
                   - switch.turn_on: auger
                   - delay: 30s
                   - switch.turn_off: auger
-            # done lighting
-            - lambda: id(status_msg).publish_state("Pot Lit");
-            - delay: 2s
-            - lambda: id(status_msg).publish_state("Heating Mode");
-            - script.execute: sc_pot_heating
-            - delay: 300s
-            # keep igniter on for 5 minutes after start, then let it go
-            - switch.turn_off: igniter
+            # done lighting -- only declare the pot lit if it actually got hot
+            - if:
+                condition:
+                  lambda: 'return (id(pot_temp).state * 1.8f + 32.0f) >= id(pot_lit_threshold).state;'
+                then:
+                  - lambda: id(status_msg).publish_state("Pot Lit");
+                  - delay: 2s
+                  - lambda: id(status_msg).publish_state("Heating Mode");
+                  - script.execute: sc_pot_heating
+                  - delay: 300s
+                  # keep igniter on for 5 minutes after start, then let it go
+                  - switch.turn_off: igniter
+                else:
+                  - logger.log: "Firepot never reached lit threshold -> Safe Mode"
+                  - script.execute: sc_enter_safe_mode
 
   - id: sc_pot_heating
     mode: restart
@@ -686,11 +738,24 @@ script:
     mode: single
     then:
       - logger.log: "sc_stop_all_smoking executing"
-      - lambda: id(status_msg).publish_state("Stopping...");
+      - lambda: if (!id(in_safe_mode)) id(status_msg).publish_state("Stopping...");
       - script.stop: sc_light_pot
       - script.stop: sc_pot_heating
       - switch.turn_off: igniter
       - switch.turn_off: auger
+
+  # Firepot failed to light, or died during a cook. Latch Safe Mode and turn the
+  # system off -- go.on_turn_off runs sc_stop_all_smoking (auger + igniter off) and,
+  # via fan.on_turn_off, keeps the fan running until the smoker drops below 175 F.
+  - id: sc_enter_safe_mode
+    mode: single
+    then:
+      - logger.log: "ENTERING SAFE MODE: firepot fault"
+      - lambda: |-
+          id(in_safe_mode) = true;
+          id(status_msg).publish_state("Safe Mode");
+      - delay: 0.01s   # let the calling script unwind before go.on_turn_off stops it
+      - switch.turn_off: go
 
   - id: sc_shutdown
     mode: single
@@ -899,7 +964,7 @@ script:
       - logger.log: "sc_wake: display on"
       - light.turn_on: display_backlight
       - lambda: |-
-          id(status_msg).publish_state("Ready");
+          id(status_msg).publish_state(id(in_safe_mode) ? "Safe Mode" : "Ready");
           id(last_activity_ms) = millis();
           id(wake_lockout_ms) = millis();
 
@@ -918,4 +983,29 @@ interval:
               - lambda: 'return (millis() - id(last_activity_ms)) > (uint32_t) (id(sleep_timeout).state * 1000.0f);'
           then:
             - script.execute: sc_sleep
+
+  # Firepot watchdog: while actively heating, if the pot stays below the lit
+  # threshold longer than firepot_fail_timeout, drop into Safe Mode.
+  - interval: 10s
+    then:
+      - lambda: |-
+          // Only watch during an active heating cycle.
+          if (id(in_safe_mode) || !id(go).state || id(status_msg).state != "Heating Mode") {
+            id(pot_below_since_ms) = 0;
+            return;
+          }
+          float pot_f = id(pot_temp).state * 1.8f + 32.0f;
+          if (pot_f >= id(pot_lit_threshold).state) {
+            id(pot_below_since_ms) = 0;   // hot enough -- reset the fault timer
+            return;
+          }
+          uint32_t now = millis();
+          if (id(pot_below_since_ms) == 0) {
+            id(pot_below_since_ms) = now;  // first sample below threshold
+            return;
+          }
+          if (now - id(pot_below_since_ms) > (uint32_t) (id(firepot_fail_timeout).state * 1000.0f)) {
+            ESP_LOGW("firepot", "Pot below %.0f F for too long -> Safe Mode", id(pot_lit_threshold).state);
+            id(sc_enter_safe_mode).execute();
+          }
 
