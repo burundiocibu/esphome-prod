@@ -3,27 +3,27 @@ substitutions:
   meid: "bessy-b"
 
   # ---- pin map (matches the wiring table) ----
-  pin_spi_clk:  GPIO18
-  pin_spi_miso: GPIO19
-  pin_spi_mosi: GPIO27
-  pin_tft_cs:   GPIO4
-  pin_tft_dc:   GPIO14
-  pin_tft_rst:  GPIO13
-  pin_tft_bl:   GPIO5
-  pin_rtd_cs:   GPIO16
-  pin_i2c_sda:  GPIO21
-  pin_i2c_scl:  GPIO22
-  pin_analog:   GPIO34
-  pin_enc_a:    GPIO35
-  pin_enc_b:    GPIO39
-  pin_enc_sw:   GPIO36
-  pin_ctc_int:  GPIO23
-  pin_ctc_rst:  GPIO12
+  pin_spi_clk:  GPIO18  # SCLK,  Yellow, row 7
+  pin_spi_miso: GPIO19  # MISO,  Green,  row 8
+  pin_spi_mosi: GPIO27  # MOSI,  Blue,   row 9
+  pin_tft_cs:   GPIO4   # CS,    Grey,   row 10
+  pin_tft_dc:   GPIO14  # RS,    Violet, row 11
+  pin_tft_rst:  GPIO13  # RST,   Brown,  row 12
+  pin_tft_bl:   GPIO5   # BL,    White,  row 13
+  pin_rtd_cs:   GPIO16  # CS,    Orange, row 14
+  pin_i2c_sda:  GPIO21  # SDA,   Blue,   row 16
+  pin_i2c_scl:  GPIO22  # SCL,   Green,  row 17
+  pin_analog:   GPIO34  # AIN,   White,  row 18
+  pin_enc_a:    GPIO35  # A,     Grey,   row 19
+  pin_enc_b:    GPIO39  # B,     Brown,  row 20
+  pin_enc_sw:   GPIO36  # SW,    Yellow, row 21
+  pin_ctc_int:  GPIO23  # INT,   White,  row 25
+  pin_ctc_rst:  GPIO12  # RST,   Violet, row 26
   pin_relay1:   GPIO32
   pin_relay2:   GPIO33
   pin_relay3:   GPIO25
   pin_relay4:   GPIO26
-  pin_status:   GPIO23
+  pin_status:   GPIO23  # INT,   White,  row 25
 
 esphome:
   name: ${me}
@@ -43,7 +43,6 @@ esphome:
             - switch.turn_off: fan
             - lambda: id(status_msg).publish_state("Ready");
 
-
 esp32:
   board: esp32dev
   variant: esp32
@@ -51,7 +50,20 @@ esp32:
     type: esp-idf
 
 logger:
-  level: DEBUG
+  level: INFO
+
+globals:
+  # Timestamp (millis) of the last user input; drives the Asleep inactivity timeout.
+  - id: last_activity_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  # Timestamp (millis) of the last wake; a brief grace window after this swallows
+  # the extra encoder detents that a single wake gesture emits.
+  - id: wake_lockout_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
 
 api:
   encryption:
@@ -73,7 +85,7 @@ captive_portal:
 
 web_server:
   port: 80
-  version: 3
+  version: 2
 
 prometheus:
 
@@ -87,6 +99,7 @@ i2c:
   sda: ${pin_i2c_sda}
   scl: ${pin_i2c_scl}
   scan: true
+  frequency: 10kHz # the MCP9600 likes it _slow_
 
 # ===================== Display =====================
 output:
@@ -99,6 +112,7 @@ output:
 light:
   - platform: monochromatic
     name: "Display Backlight"
+    id: display_backlight
     output: tft_backlight
     restore_mode: ALWAYS_ON
 
@@ -123,15 +137,23 @@ display:
     reset_pin: ${pin_tft_rst}
     update_interval: 0.5s
     invert_colors: true
+    color_depth: 8BIT
+    data_rate: 40MHz
     lambda: |-
       auto fg = Color(0, 0, 0);        // black in buffer → white on screen (panel inverts)
       auto bg = Color(255, 255, 255);   // white in buffer → black on screen (panel inverts)
       auto red = Color(255, 0, 0);
       it.fill(bg);
+
       it.printf(10, 6, id(roboto), fg, TextAlign::TOP_LEFT, "%s", id(status_msg).state.c_str());
+      it.printf(10, 40, id(roboto), fg, TextAlign::TOP_LEFT, "Fan %s", id(fan).state ? "On" : "Off");
+      it.printf(10, 70, id(roboto), fg, TextAlign::TOP_LEFT, "Igniter %s", id(igniter).state ? "On" : "Off");
+      it.printf(10, 100, id(roboto), fg, TextAlign::TOP_LEFT, "Auger %s", id(auger).state ? "On" : "Off");
       it.printf(470, 6, id(roboto_pot), red, TextAlign::TOP_RIGHT, "%.0f F", id(pot_temp).state * 1.8f + 32.0f);
+
       it.printf(240, 70, id(roboto_big), fg, TextAlign::TOP_CENTER, "%.0f F", id(smoker_set_temp).state);
       it.printf(240, 160, id(roboto_big), fg, TextAlign::TOP_CENTER, "%.0f F", id(smoker_temp_f).state);
+
       it.printf(80,  280, id(roboto), fg, TextAlign::TOP_CENTER, "%.0f F", id(ntc_temp_a2).state * 1.8f + 32.0f);
       it.printf(240, 280, id(roboto), fg, TextAlign::TOP_CENTER, "%.0f F", id(ntc_temp_a1).state * 1.8f + 32.0f);
       it.printf(400, 280, id(roboto), fg, TextAlign::TOP_CENTER, "%.0f F", id(ntc_temp_a0).state * 1.8f + 32.0f);
@@ -144,8 +166,16 @@ touchscreen:
       number: ${pin_ctc_rst}
       ignore_strapping_warning: true
     on_touch:
-      - lambda: |-
-          ESP_LOGI("touch", "Touch at x=%d, y=%d", touch.x, touch.y);
+      - if:
+          condition:
+            lambda: 'return id(status_msg).state == "Asleep";'
+          then:
+            # Asleep: swallow the touch, just wake the display
+            - script.execute: sc_wake
+          else:
+            - lambda: |-
+                id(last_activity_ms) = millis();
+                ESP_LOGI("touch", "Touch at x=%d, y=%d", touch.x, touch.y);
 
 # ADS1115 hub (default address; ADDR->GND = 0x48)
 ads1115:
@@ -167,6 +197,7 @@ sensor:
   # MCP9600 thermocouple amp on shared I2C bus (MAX31855 SPI didn't play nice with the display)
   - platform: mcp9600
     update_interval: 5s
+    address: 0x60
     hot_junction:
       name: "Pot Temperature"
       id: pot_temp
@@ -177,19 +208,16 @@ sensor:
   # ADS1115 — four single-ended channels (A0..A3 referenced to GND).
   # A0-A2: 100kΩ NTC thermistors via 47kΩ bias resistor (3.3V → 47kΩ → node → NTC → GND)
   - platform: ads1115
-    name: "ADS1115 A0"
     id: ads_a0
     multiplexer: A0_GND
     gain: 4.096
     update_interval: 5s
   - platform: ads1115
-    name: "ADS1115 A1"
     id: ads_a1
     multiplexer: A1_GND
     gain: 4.096
     update_interval: 5s
   - platform: ads1115
-    name: "ADS1115 A2"
     id: ads_a2
     multiplexer: A2_GND
     gain: 4.096
@@ -197,7 +225,6 @@ sensor:
   # A3: PT100 RTD via 3.3kΩ 0.1% bias resistor (3.3V → 3.3kΩ → node → PT100 → GND)
   # Self-heating: ~0.1-0.2mW. V range: 0.106V (25°C) to 0.199V (300°C).
   - platform: ads1115
-    name: "ADS1115 A3"
     id: ads_a3
     multiplexer: A3_GND
     gain: 0.256
@@ -327,6 +354,13 @@ sensor:
         input: true
     on_clockwise:
       - lambda: |-
+          if (id(status_msg).state == "Asleep") {  // wake, swallow this event
+            id(sc_wake).execute();
+            return;
+          }
+          // grace window after wake: swallow extra detents from the same gesture
+          if (millis() - id(wake_lockout_ms) < 500) return;
+          id(last_activity_ms) = millis();
           float current_temp = id(smoker_set_temp).state;
           float increment = (current_temp <= 225.0f) ? 5.0f : 25.0f;
           float new_temp = current_temp + increment;
@@ -337,6 +371,13 @@ sensor:
           }
     on_anticlockwise:
       - lambda: |-
+          if (id(status_msg).state == "Asleep") {  // wake, swallow this event
+            id(sc_wake).execute();
+            return;
+          }
+          // grace window after wake: swallow extra detents from the same gesture
+          if (millis() - id(wake_lockout_ms) < 500) return;
+          id(last_activity_ms) = millis();
           float current_temp = id(smoker_set_temp).state;
           float increment = (current_temp <= 225.0f) ? -5.0f : -25.0f;
           float new_temp = current_temp + increment;
@@ -360,13 +401,27 @@ binary_sensor:
       - timing:
           - ON for at most 1s
         then:
-          - logger.log: "Encoder short press - starting smoker"
-          - switch.turn_on: go
+          - if:
+              condition:
+                lambda: 'return id(status_msg).state == "Asleep";'
+              then:
+                - script.execute: sc_wake   # swallow: button just wakes
+              else:
+                - lambda: id(last_activity_ms) = millis();
+                - logger.log: "Encoder short press - starting smoker"
+                - switch.turn_on: go
       - timing:
           - ON for at least 1s
         then:
-          - logger.log: "Encoder long press - stopping smoker"
-          - switch.turn_off: go
+          - if:
+              condition:
+                lambda: 'return id(status_msg).state == "Asleep";'
+              then:
+                - script.execute: sc_wake   # swallow: button just wakes
+              else:
+                - lambda: id(last_activity_ms) = millis();
+                - logger.log: "Encoder long press - stopping smoker"
+                - switch.turn_off: go
 
 # ===================== Relays + LED =====================
 switch:
@@ -404,7 +459,7 @@ switch:
     id: relay_4
     pin: ${pin_relay4}
   - platform: template
-    name: "System ON/OFF"
+    name: "System ON⁄OFF"
     id: go
     optimistic: true
     on_turn_on:
@@ -558,6 +613,19 @@ number:
     mode: slider
     on_value:
       - script.execute: sc_pid_control
+
+  - platform: template
+    name: "Sleep Timeout"
+    id: sleep_timeout
+    min_value: 10
+    max_value: 3600
+    step: 10
+    initial_value: 120
+    optimistic: true
+    restore_value: true
+    unit_of_measurement: "s"
+    mode: box
+    icon: mdi:sleep
 
 script:
   - id: sc_light_pot
@@ -814,4 +882,40 @@ script:
           ESP_LOGD("PID", "Pb: %.3f, Ti: %.3f, Td: %.3f", pb, ti, td);
           ESP_LOGD("PID", "StableWindow: %.3f", stable_window);
       - logger.log: "sc_pid_control.ENDING"
+
+  # Enter the Asleep state: blank the display backlight. Relays are untouched
+  # (the inactivity timer only fires when the smoker is already idle).
+  - id: sc_sleep
+    mode: single
+    then:
+      - logger.log: "sc_sleep: display off"
+      - lambda: id(status_msg).publish_state("Asleep");
+      - light.turn_off: display_backlight
+
+  # Wake from Asleep: restore the backlight, return to Ready, reset the idle timer.
+  - id: sc_wake
+    mode: single
+    then:
+      - logger.log: "sc_wake: display on"
+      - light.turn_on: display_backlight
+      - lambda: |-
+          id(status_msg).publish_state("Ready");
+          id(last_activity_ms) = millis();
+          id(wake_lockout_ms) = millis();
+
+# ===================== Sleep timer =====================
+# Blank the display after `sleep_timeout` of no input, but only when fully idle
+# (smoker off and not cooling down). Any touch / encoder input wakes it.
+interval:
+  - interval: 5s
+    then:
+      - if:
+          condition:
+            and:
+              - lambda: 'return id(status_msg).state != "Asleep";'
+              - switch.is_off: go
+              - switch.is_off: fan
+              - lambda: 'return (millis() - id(last_activity_ms)) > (uint32_t) (id(sleep_timeout).state * 1000.0f);'
+          then:
+            - script.execute: sc_sleep
 
