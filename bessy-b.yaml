@@ -51,12 +51,7 @@ esp32:
 
 logger:
   # DEBUG so text_sensor state changes (status_msg, etc.) are compiled in and visible.
-  level: DEBUG
-  logs:
-    sensor: NONE            # sensor state ('name >> value') is VERBOSE; DEBUG build already drops it
-    ads1115.sensor: NONE    # 'Got Voltage=...' per-conversion debug
-    ct_clamp: NONE          # 'Raw AC Value: ...' per-sample debug
-    text_sensor: DEBUG      # keep text-sensor state changes visible
+  level: INFO
 
 globals:
   # Timestamp (millis) of the last user input; drives the Asleep inactivity timeout.
