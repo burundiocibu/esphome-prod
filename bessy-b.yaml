@@ -50,7 +50,6 @@ esp32:
     type: esp-idf
 
 logger:
-  # DEBUG so text_sensor state changes (status_msg, etc.) are compiled in and visible.
   level: INFO
 
 globals:
@@ -224,16 +223,19 @@ sensor:
     id: ads_a0
     multiplexer: A0_GND
     gain: 4.096
+    sample_rate: 128
     update_interval: 5s
   - platform: ads1115
     id: ads_a1
     multiplexer: A1_GND
     gain: 4.096
+    sample_rate: 128
     update_interval: 5s
   - platform: ads1115
     id: ads_a2
     multiplexer: A2_GND
     gain: 4.096
+    sample_rate: 128
     update_interval: 5s
   # A3: PT100 RTD via 3.3kΩ 0.1% bias resistor (3.3V → 3.3kΩ → node → PT100 → GND)
   # Self-heating: ~0.1-0.2mW. V range: 0.106V (25°C) to 0.199V (300°C).
@@ -241,7 +243,16 @@ sensor:
     id: ads_a3
     multiplexer: A3_GND
     gain: 0.256
-    update_interval: 5s
+    sample_rate: 128
+    update_interval: 0.25s      # fast reads (~9ms each) to feed firmware averaging
+    filters:
+      # De-spike, then boxcar-average ~20 samples -> one clean value every ~5s.
+      - median:
+          window_size: 5
+          send_every: 5
+      - sliding_window_moving_average:
+          window_size: 4
+          send_every: 4
 
   # NTC temperature sensors — Beta equation: β=3950, R0=100kΩ @ 25°C, R_bias=47kΩ
   # T(K) = 1 / (1/298.15 + ln(R_ntc/100000) / 3950)
