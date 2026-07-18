@@ -1,6 +1,5 @@
 substitutions:
   me: "bessy-b"
-  meid: "bessy-b"
 
   # ---- pin map (matches the wiring table) ----
   pin_spi_clk:  GPIO18  # SCLK,  Yellow, row 7
@@ -10,7 +9,7 @@ substitutions:
   pin_tft_dc:   GPIO14  # RS,    Violet, row 11
   pin_tft_rst:  GPIO13  # RST,   Brown,  row 12
   pin_tft_bl:   GPIO5   # BL,    White,  row 13
-  pin_rtd_cs:   GPIO16  # CS,    Orange, row 14
+  pin_rtd_cs:   GPIO16  # unused (was RTD CS, Orange, row 14; RTD is on ADS1115 A3 now)
   pin_i2c_sda:  GPIO21  # SDA,   Blue,   row 16
   pin_i2c_scl:  GPIO22  # SCL,   Green,  row 17
   pin_analog:   GPIO34  # AIN,   White,  row 18
@@ -19,10 +18,10 @@ substitutions:
   pin_enc_sw:   GPIO36  # SW,    Yellow, row 21
   pin_ctc_int:  GPIO23  # INT,   White,  row 25
   pin_ctc_rst:  GPIO12  # RST,   Violet, row 26
-  pin_relay1:   GPIO32
-  pin_relay2:   GPIO33
-  pin_relay3:   GPIO25
-  pin_relay4:   GPIO26
+  pin_relay1:   GPIO32  # Auger
+  pin_relay2:   GPIO33  # Fan
+  pin_relay3:   GPIO25  # Igniter
+  pin_relay4:   GPIO26  # Unused
   pin_status:   GPIO23  # INT,   White,  row 25
 
 esphome:
@@ -32,16 +31,9 @@ esphome:
   on_boot:
     priority: -100
     then:
+      # The hot-start check lives in smoker_temp_f.on_value: at this point no sensor
+      # has published yet, so a temperature check here would always see NAN.
       - lambda: id(status_msg).publish_state("Ready");
-      - if:
-          condition:
-            lambda: return id(smoker_temp_f).state > 175.0;
-          then:
-            - switch.turn_on: fan
-            - lambda: id(status_msg).publish_state("Hot startup - Fan ON");
-          else:
-            - switch.turn_off: fan
-            - lambda: id(status_msg).publish_state("Ready");
 
 esp32:
   board: esp32dev
@@ -237,8 +229,8 @@ sensor:
     gain: 4.096
     sample_rate: 128
     update_interval: 5s
-  # A3: PT100 RTD via 3.3kΩ 0.1% bias resistor (3.3V → 3.3kΩ → node → PT100 → GND)
-  # Self-heating: ~0.1-0.2mW. V range: 0.106V (25°C) to 0.199V (300°C).
+  # A3: PT100 RTD via 3.0kΩ 0.1% bias resistor (3.3V → 3.0kΩ → node → PT100 → GND)
+  # Self-heating: ~0.1-0.2mW. V range: 0.116V (25°C) to 0.218V (300°C).
   - platform: ads1115
     id: ads_a3
     multiplexer: A3_GND
@@ -291,7 +283,7 @@ sensor:
       return 1.0f / (1.0f / 298.15f + logf(r / 100000.0f) / 3950.0f) - 273.15f;
 
   # PT100 RTD temperature — Callendar-Van Dusen inverse (IEC 60751, T ≥ 0°C)
-  # R_ref = 3300Ω (update to measured value for best accuracy)
+  # R_ref = 3000Ω (update to measured value for best accuracy)
   # R_PT = R_ref * V / (3.3 - V); then solve quadratic B*T² + A*T + (1 - R/R0) = 0
   - platform: template
     name: "Smoker Temperature"
@@ -324,6 +316,24 @@ sensor:
       } else {
         return NAN;
       }
+    on_value:
+      then:
+        # Hot-start check (runs once, right after boot): on_boot fires before any
+        # sensor has published, so a temperature check there always sees NAN. Do it
+        # here instead -- if we rebooted (power blip / OTA / crash) into a hot
+        # smoker with the system off, get the fan running and start the cooldown
+        # watchdog.
+        - if:
+            condition:
+              and:
+                - lambda: "return millis() < 30000;"
+                - switch.is_off: go
+                - lambda: "return x > 175.0f;"
+            then:
+              - logger.log: "Hot startup - Fan ON"
+              - switch.turn_on: fan
+              - lambda: id(status_msg).publish_state("Hot startup - Fan ON");
+              - script.execute: sc_shutdown
 
   # Keeps the fire pot lit: modulates the igniter based on pot temperature.
   # 300°F/325°F thresholds ported directly from Traeger-D1's firepot_monitor.
@@ -454,7 +464,7 @@ switch:
   - platform: gpio
     name: "Fan"
     id: fan
-    pin: ${pin_relay1}
+    pin: ${pin_relay2}
     restore_mode: ALWAYS_OFF
     on_turn_off:
       - if:
@@ -472,7 +482,7 @@ switch:
   - platform: gpio
     name: "Auger"
     id: auger
-    pin: ${pin_relay2}
+    pin: ${pin_relay1}
     restore_mode: ALWAYS_OFF
   - platform: gpio
     name: "Igniter"
@@ -488,7 +498,10 @@ switch:
     optimistic: true
     on_turn_on:
       - logger.log: "System turned ON"
-      - lambda: id(in_safe_mode) = false;   # a fresh start clears any latched safe mode
+      - light.turn_on: display_backlight   # wake the display for remote (HA) starts
+      - lambda: |-
+          id(in_safe_mode) = false;   // a fresh start clears any latched safe mode
+          id(last_activity_ms) = millis();
       - script.execute: sc_pid_control
       - switch.turn_on: fan
       - script.execute: sc_light_pot
@@ -716,7 +729,8 @@ script:
                   - lambda: id(status_msg).publish_state("Heating Mode");
                   - script.execute: sc_pot_heating
                   - delay: 300s
-                  # keep igniter on for 5 minutes after start, then let it go
+                  # hold the igniter on for 5 minutes after the pot is lit, then let it go
+                  # (firepot_monitor may already have turned it off above 325 F)
                   - switch.turn_off: igniter
                 else:
                   - logger.log: "Firepot never reached lit threshold -> Safe Mode"
@@ -764,7 +778,7 @@ script:
       - switch.turn_off: go
 
   - id: sc_shutdown
-    mode: single
+    mode: restart
     then:
       - switch.turn_on: fan
       - delay: 1200s  # wait 20 minutes before next check
@@ -828,6 +842,13 @@ script:
 
           // Get sensor values
           float current_temp = id(smoker_temp_f).state;
+          if (isnan(current_temp)) {
+              // No valid pit temperature -- fail safe: stop feeding pellets.
+              ESP_LOGW("PID", "smoker_temp_f is NaN, failing safe (auger off)");
+              id(auger).turn_off();
+              last_time = current_time;
+              return;
+          }
           float pb = id(pid_pb).state;  // Set to 50.0
           float ti = id(pid_ti).state;  // Set to 60.0
           float td = id(pid_td).state;  // Set to 5.0
@@ -894,13 +915,13 @@ script:
           }
 
           // Reset logic
-          if (new_target && abs(error) <= 5.0) {
+          if (new_target && fabsf(error) <= 5.0f) {
               new_target = false;
           }
-          if (new_target && current_time - last_set_time >= cycle_time * 3 && abs(error) <= abs(start_change_temp - set_point) / 2) {
+          if (new_target && current_time - last_set_time >= cycle_time * 3 && fabsf(error) <= fabsf(start_change_temp - set_point) / 2.0f) {
               integral = 0.0;
           }
-          if ((new_target && set_point < current_temp) || abs(error) > pb * 2) {
+          if ((new_target && set_point < current_temp) || fabsf(error) > pb * 2) {
               derv = 0.0;
               d = 0.0;
           }
@@ -918,7 +939,7 @@ script:
           u = u_clamped;
 
           // Reset for large integral
-          if (abs(integral) > 1000) {  // Tighter reset
+          if (fabsf(integral) > 1000.0f) {  // Tighter reset
               integral = 0.0;
           }
 
