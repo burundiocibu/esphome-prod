@@ -53,8 +53,12 @@ sensor:
       shunt_resistance: 0.1 ohm
       current:
         name: "Solar Current"
+        filters:
+          multiply: -1
       power:
         name: "Solar Power"
+        filters:
+          multiply: -1
       bus_voltage:
         name: "Solar Voltage"
     channel_3:
