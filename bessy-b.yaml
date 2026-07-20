@@ -1,28 +1,35 @@
 substitutions:
   me: "bessy-b"
 
-  # ---- pin map (matches the wiring table) ----
-  pin_spi_clk:  GPIO18  # SCLK,  Yellow, row 7
-  pin_spi_miso: GPIO19  # MISO,  Green,  row 8
-  pin_spi_mosi: GPIO27  # MOSI,  Blue,   row 9
-  pin_tft_cs:   GPIO4   # CS,    Grey,   row 10
-  pin_tft_dc:   GPIO14  # RS,    Violet, row 11
-  pin_tft_rst:  GPIO13  # RST,   Brown,  row 12
-  pin_tft_bl:   GPIO5   # BL,    White,  row 13
-  pin_rtd_cs:   GPIO16  # unused (was RTD CS, Orange, row 14; RTD is on ADS1115 A3 now)
-  pin_i2c_sda:  GPIO21  # SDA,   Blue,   row 16
-  pin_i2c_scl:  GPIO22  # SCL,   Green,  row 17
-  pin_analog:   GPIO34  # AIN,   White,  row 18
-  pin_enc_a:    GPIO35  # A,     Grey,   row 19
-  pin_enc_b:    GPIO39  # B,     Brown,  row 20
-  pin_enc_sw:   GPIO36  # SW,    Yellow, row 21
-  pin_ctc_int:  GPIO23  # INT,   White,  row 25
-  pin_ctc_rst:  GPIO12  # RST,   Violet, row 26
+  # Smoker state machine states (smoker_state global; see sc_set_state)
+  st_off: 0        # idle -- fan, auger, igniter off
+  st_lighting: 1   # sc_light_pot running
+  st_heating: 2    # sc_pot_heating running (PID auger cycling)
+  st_cooldown: 3   # go off, fan held on until the pit drops below 175 F
+  st_safe: 4       # latched firepot fault
+
+  # I/O assignments.
+  pin_spi_clk:  GPIO18  # Yellow, row 7
+  pin_spi_miso: GPIO19  # Green,  row 8
+  pin_spi_mosi: GPIO27  # Blue,   row 9
+  pin_tft_cs:   GPIO4   # Grey,   row 10
+  pin_tft_dc:   GPIO14  # Violet, row 11
+  pin_tft_rst:  GPIO13  # Brown,  row 12
+  pin_tft_bl:   GPIO5   # White,  row 13
+  pin_rtd_cs:   GPIO16  # Orange, row 14
+  pin_i2c_sda:  GPIO21  # Blue,   row 1  , w 4.7k pullup
+  pin_i2c_scl:  GPIO22  # Green,  row 17 , w 4.7k pullup
+  pin_analog:   GPIO34  # White,  row 18
+  pin_enc_a:    GPIO35  # Grey,   row 19 
+  pin_enc_b:    GPIO39  # Brown,  row 20
+  pin_enc_sw:   GPIO36  # Yellow, row 21, w 10k pullup
+  pin_ctc_int:  GPIO23  # White,  row 25, ""
+  pin_ctc_rst:  GPIO12  # Violet, row 26, ""
+  pin_status:   GPIO23  # White,  row 25
   pin_relay1:   GPIO32  # Auger
   pin_relay2:   GPIO33  # Fan
   pin_relay3:   GPIO25  # Igniter
   pin_relay4:   GPIO26  # Unused
-  pin_status:   GPIO23  # INT,   White,  row 25
 
 esphome:
   name: ${me}
@@ -31,9 +38,12 @@ esphome:
   on_boot:
     priority: -100
     then:
-      # The hot-start check lives in smoker_temp_f.on_value: at this point no sensor
-      # has published yet, so a temperature check here would always see NAN.
-      - lambda: id(status_msg).publish_state("Ready");
+      # Publishes "Ready" via the state machine. The hot-start check lives in
+      # smoker_temp_f.on_value: at this point no sensor has published yet, so a
+      # temperature check here would always see NAN.
+      - script.execute:
+          id: sc_set_state
+          new_state: ${st_off}
 
 esp32:
   board: esp32dev
@@ -56,10 +66,16 @@ globals:
     type: uint32_t
     restore_value: no
     initial_value: '0'
-  # Latched when the firepot fails to light / dies. Suppresses the normal status
-  # messages so the display keeps showing "Safe Mode"; cleared when the system is
-  # (re)started via the go switch.
-  - id: in_safe_mode
+  # Smoker state machine state (one of the st_* substitution values). Single
+  # source of truth for control logic; status_msg is derived from it (and from
+  # display_asleep) exclusively by sc_set_state.
+  - id: smoker_state
+    type: int
+    restore_value: no
+    initial_value: '0'
+  # Display overlay: true while the screen is blanked by the inactivity timer.
+  # Orthogonal to smoker_state; user inputs check this to decide wake-vs-act.
+  - id: display_asleep
     type: bool
     restore_value: no
     initial_value: 'false'
@@ -172,7 +188,7 @@ touchscreen:
     on_touch:
       - if:
           condition:
-            lambda: 'return id(status_msg).state == "Asleep";'
+            lambda: 'return id(display_asleep);'
           then:
             # Asleep: swallow the touch, just wake the display
             - script.execute: sc_wake
@@ -332,23 +348,29 @@ sensor:
             then:
               - logger.log: "Hot startup - Fan ON"
               - switch.turn_on: fan
-              - lambda: id(status_msg).publish_state("Hot startup - Fan ON");
+              - script.execute:
+                  id: sc_set_state
+                  new_state: ${st_cooldown}
               - script.execute: sc_shutdown
 
   # Keeps the fire pot lit: modulates the igniter based on pot temperature.
-  # 300°F/325°F thresholds ported directly from Traeger-D1's firepot_monitor.
+  # Re-ignites below pot_lit_threshold, cuts the igniter 25 F above it.
   - platform: template
     name: "Firepot Monitor"
     id: firepot_monitor
     update_interval: 10s
     lambda: |-
+      // Relight band derived from pot_lit_threshold (F): re-ignite below it,
+      // cut the igniter 25 F above it. pot_temp is in C.
+      const float lit_c = (id(pot_lit_threshold).state - 32.0f) / 1.8f;
+      const float cut_c = (id(pot_lit_threshold).state + 25.0f - 32.0f) / 1.8f;
       if (id(go).state) {
-        if (id(pot_temp).state < 148.9f) {
+        if (id(pot_temp).state < lit_c) {
           if (!id(igniter).state) {
             id(igniter).turn_on();
           }
           return 1.0f;
-        } else if (id(pot_temp).state > 162.8f) {
+        } else if (id(pot_temp).state > cut_c) {
           id(igniter).turn_off();
           return 0.0f;
         }
@@ -388,7 +410,7 @@ sensor:
         input: true
     on_clockwise:
       - lambda: |-
-          if (id(status_msg).state == "Asleep") {  // wake, swallow this event
+          if (id(display_asleep)) {  // wake, swallow this event
             id(sc_wake).execute();
             return;
           }
@@ -405,7 +427,7 @@ sensor:
           }
     on_anticlockwise:
       - lambda: |-
-          if (id(status_msg).state == "Asleep") {  // wake, swallow this event
+          if (id(display_asleep)) {  // wake, swallow this event
             id(sc_wake).execute();
             return;
           }
@@ -437,7 +459,7 @@ binary_sensor:
         then:
           - if:
               condition:
-                lambda: 'return id(status_msg).state == "Asleep";'
+                lambda: 'return id(display_asleep);'
               then:
                 - script.execute: sc_wake   # swallow: button just wakes
               else:
@@ -449,7 +471,7 @@ binary_sensor:
         then:
           - if:
               condition:
-                lambda: 'return id(status_msg).state == "Asleep";'
+                lambda: 'return id(display_asleep);'
               then:
                 - script.execute: sc_wake   # swallow: button just wakes
               else:
@@ -466,19 +488,26 @@ switch:
     id: fan
     pin: ${pin_relay2}
     restore_mode: ALWAYS_OFF
+    # Hardware interlock: any attempt to turn the fan off while the smoker is hot
+    # is overridden -- the fan runs until it cools. Deliberately publishes NO
+    # status text; all state/status changes go through sc_set_state.
     on_turn_off:
       - if:
-          # If the smoker is still hot, override this and keep the fan running until it cools.
           condition:
             lambda: return !isnan(id(smoker_temp_f).state) && id(smoker_temp_f).state > 175.0f;
           then:
             - logger.log: "Smoker is still hot, keeping fan on"
             - switch.turn_on: fan
-            - lambda: if (!id(in_safe_mode)) id(status_msg).publish_state("Cooling down");
             - script.execute: sc_shutdown
           else:
             - script.stop: sc_shutdown
-            - lambda: if (!id(in_safe_mode)) id(status_msg).publish_state("Ready");
+            - if:
+                condition:
+                  lambda: return id(smoker_state) == ${st_cooldown};
+                then:
+                  - script.execute:
+                      id: sc_set_state
+                      new_state: ${st_off}
   - platform: gpio
     name: "Auger"
     id: auger
@@ -498,18 +527,43 @@ switch:
     optimistic: true
     on_turn_on:
       - logger.log: "System turned ON"
-      - light.turn_on: display_backlight   # wake the display for remote (HA) starts
-      - lambda: |-
-          id(in_safe_mode) = false;   // a fresh start clears any latched safe mode
-          id(last_activity_ms) = millis();
-      - script.execute: sc_pid_control
-      - switch.turn_on: fan
-      - script.execute: sc_light_pot
+      # Template switch triggers fire even when already on -- ignore repeat
+      # activations while a cook is active so the state machine can't regress.
+      - if:
+          condition:
+            lambda: return id(smoker_state) != ${st_lighting} && id(smoker_state) != ${st_heating};
+          then:
+            - light.turn_on: display_backlight   # wake the display for remote (HA) starts
+            - lambda: |-
+                id(display_asleep) = false;
+                id(last_activity_ms) = millis();
+            - script.stop: sc_shutdown   # a fresh start cancels any cooldown fan watchdog
+            - script.execute: sc_pid_control
+            - switch.turn_on: fan
+            - script.execute:
+                id: sc_set_state
+                new_state: ${st_lighting}
+            - script.execute: sc_light_pot
     on_turn_off:
       - logger.log: "System turned OFF"
       - script.execute: sc_stop_all_smoking
-      - lambda: if (!id(in_safe_mode)) id(status_msg).publish_state("Turned OFF");
-      - switch.turn_off: fan
+      - if:
+          # SAFE is latched: leave the state (and "Safe Mode" text) alone.
+          condition:
+            lambda: return id(smoker_state) != ${st_safe};
+          then:
+            - if:
+                condition:
+                  lambda: return !isnan(id(smoker_temp_f).state) && id(smoker_temp_f).state > 175.0f;
+                then:
+                  - script.execute:
+                      id: sc_set_state
+                      new_state: ${st_cooldown}
+                else:
+                  - script.execute:
+                      id: sc_set_state
+                      new_state: ${st_off}
+      - switch.turn_off: fan   # interlock keeps it running if the smoker is hot
 
 # ===================== PID control (ported from Traeger-D1) =====================
 # Tuning knobs are exposed as numbers so they can be adjusted from Home Assistant;
@@ -692,6 +746,28 @@ number:
     icon: mdi:fire-alert
 
 script:
+  # Single writer for smoker_state AND status_msg. All state transitions go
+  # through here; the status text is a pure function of state + display_asleep.
+  # One-shot "flash" messages (e.g. "Pot Lit") may be published directly only
+  # when a transition through here follows to overwrite them.
+  - id: sc_set_state
+    mode: single
+    parameters:
+      new_state: int
+    then:
+      - lambda: |-
+          id(smoker_state) = new_state;
+          const char *msg = "Ready";
+          switch (new_state) {
+            case ${st_lighting}: msg = "Lighting Fire Pot"; break;
+            case ${st_heating}:  msg = "Heating Mode"; break;
+            case ${st_cooldown}: msg = "Cooling down"; break;
+            case ${st_safe}:     msg = "Safe Mode"; break;
+          }
+          if (id(display_asleep)) msg = "Asleep";
+          ESP_LOGI("state", "smoker_state -> %d (%s)", new_state, msg);
+          id(status_msg).publish_state(msg);
+
   - id: sc_light_pot
     mode: single
     then:
@@ -702,7 +778,6 @@ script:
           then:
             - delay: 0.01s   # prevents race conditions from occurring
             - logger.log: "Lighting fire pot now"
-            - lambda: id(status_msg).publish_state("Lighting Fire Pot");
             - switch.turn_on: igniter
             - switch.turn_on: auger
             - delay: 90s # load up pellets
@@ -724,13 +799,16 @@ script:
                 condition:
                   lambda: 'return (id(pot_temp).state * 1.8f + 32.0f) >= id(pot_lit_threshold).state;'
                 then:
+                  # flash -- overwritten by the HEATING transition below
                   - lambda: id(status_msg).publish_state("Pot Lit");
                   - delay: 2s
-                  - lambda: id(status_msg).publish_state("Heating Mode");
+                  - script.execute:
+                      id: sc_set_state
+                      new_state: ${st_heating}
                   - script.execute: sc_pot_heating
                   - delay: 300s
                   # hold the igniter on for 5 minutes after the pot is lit, then let it go
-                  # (firepot_monitor may already have turned it off above 325 F)
+                  # (firepot_monitor may already have turned it off at lit threshold + 25 F)
                   - switch.turn_off: igniter
                 else:
                   - logger.log: "Firepot never reached lit threshold -> Safe Mode"
@@ -758,22 +836,22 @@ script:
     mode: single
     then:
       - logger.log: "sc_stop_all_smoking executing"
-      - lambda: if (!id(in_safe_mode)) id(status_msg).publish_state("Stopping...");
       - script.stop: sc_light_pot
       - script.stop: sc_pot_heating
       - switch.turn_off: igniter
       - switch.turn_off: auger
 
-  # Firepot failed to light, or died during a cook. Latch Safe Mode and turn the
-  # system off -- go.on_turn_off runs sc_stop_all_smoking (auger + igniter off) and,
-  # via fan.on_turn_off, keeps the fan running until the smoker drops below 175 F.
+  # Firepot failed to light, or died during a cook. Latch the SAFE state and turn
+  # the system off -- go.on_turn_off runs sc_stop_all_smoking (auger + igniter
+  # off), leaves the state alone, and, via the fan interlock, keeps the fan
+  # running until the smoker drops below 175 F.
   - id: sc_enter_safe_mode
     mode: single
     then:
       - logger.log: "ENTERING SAFE MODE: firepot fault"
-      - lambda: |-
-          id(in_safe_mode) = true;
-          id(status_msg).publish_state("Safe Mode");
+      - script.execute:
+          id: sc_set_state
+          new_state: ${st_safe}
       - delay: 0.01s   # let the calling script unwind before go.on_turn_off stops it
       - switch.turn_off: go
 
@@ -975,25 +1053,31 @@ script:
           ESP_LOGD("PID", "StableWindow: %.3f", stable_window);
       - logger.log: "sc_pid_control.ENDING"
 
-  # Enter the Asleep state: blank the display backlight. Relays are untouched
-  # (the inactivity timer only fires when the smoker is already idle).
+  # Blank the display backlight after inactivity. Relays and smoker_state are
+  # untouched (the inactivity timer only fires when the smoker is already idle).
   - id: sc_sleep
     mode: single
     then:
       - logger.log: "sc_sleep: display off"
-      - lambda: id(status_msg).publish_state("Asleep");
+      - lambda: |-
+          id(display_asleep) = true;
+          id(status_msg).publish_state("Asleep");
       - light.turn_off: display_backlight
 
-  # Wake from Asleep: restore the backlight, return to Ready, reset the idle timer.
+  # Wake from Asleep: restore the backlight, re-publish the current state's
+  # status text, reset the idle timer.
   - id: sc_wake
     mode: single
     then:
       - logger.log: "sc_wake: display on"
       - light.turn_on: display_backlight
       - lambda: |-
-          id(status_msg).publish_state(id(in_safe_mode) ? "Safe Mode" : "Ready");
+          id(display_asleep) = false;
           id(last_activity_ms) = millis();
           id(wake_lockout_ms) = millis();
+      - script.execute:
+          id: sc_set_state
+          new_state: !lambda "return id(smoker_state);"
 
 # ===================== Sleep timer =====================
 # Blank the display after `sleep_timeout` of no input, but only when fully idle
@@ -1004,7 +1088,7 @@ interval:
       - if:
           condition:
             and:
-              - lambda: 'return id(status_msg).state != "Asleep";'
+              - lambda: 'return !id(display_asleep);'
               - switch.is_off: go
               - switch.is_off: fan
               - lambda: 'return (millis() - id(last_activity_ms)) > (uint32_t) (id(sleep_timeout).state * 1000.0f);'
@@ -1016,8 +1100,9 @@ interval:
   - interval: 10s
     then:
       - lambda: |-
-          // Only watch during an active heating cycle.
-          if (id(in_safe_mode) || !id(go).state || id(status_msg).state != "Heating Mode") {
+          // Only watch during an active heating cycle. Keyed on the state machine
+          // (not the status text), so nothing outside sc_set_state can disarm it.
+          if (id(smoker_state) != ${st_heating}) {
             id(pot_below_since_ms) = 0;
             return;
           }
