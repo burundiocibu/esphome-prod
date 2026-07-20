@@ -30,46 +30,11 @@ prometheus:
 web_server:
   version: 3
 
-i2c:
-  scl: 23 # green
-  sda: 22 # blue
   
 sensor:
   - platform: uptime
     name: ${me} uptime
     update_interval: 120s
-
-  - platform: ina3221
-    address: 0x40
-    channel_1:
-      shunt_resistance: 0.1 ohm
-      current:
-        name: "Load Current"
-      power:
-        name: "Load Power"
-      bus_voltage:
-        name: "Load Voltage"
-    channel_2:
-      shunt_resistance: 0.1 ohm
-      current:
-        name: "Solar Current"
-        filters:
-          multiply: -1
-      power:
-        name: "Solar Power"
-        filters:
-          multiply: -1
-      bus_voltage:
-        name: "Solar Voltage"
-    channel_3:
-      shunt_resistance: 0.1 ohm
-      current:
-        name: "Battery Current"
-      power:
-        name: "Battery Power"
-      bus_voltage:
-        name: "Battery Voltage"
-    update_interval: 30s
 
 
   
