@@ -198,6 +198,16 @@ sensor:
       then:
         - component.update: error_state_txt
 
+  - id: load_state
+    name: Load state
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x010A
+    register_type: holding
+    value_type: U_WORD
+    bitmask: 1
+    
+
 switch:
   - id: load
     name: Load
