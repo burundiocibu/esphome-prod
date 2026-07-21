@@ -54,8 +54,7 @@ sensor:
     name: wifi signal
     update_interval: 120s
 
-  #region battery
-
+  # thank you https://github.com/dgtlcopywrite/renogy-esphome
   - id: battery_soc
     name: Battery State of Charge
     platform: modbus_controller
