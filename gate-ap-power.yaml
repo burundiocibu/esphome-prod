@@ -9,7 +9,6 @@ esp32:
   framework:
     type: esp-idf
 
-# Enable logging
 logger:
   level: INFO
 
@@ -91,10 +90,6 @@ sensor:
     filters:
       - multiply: 0.01
       
-  #endregion
-
-  #region temperature
-
   - id: controller_temperature
     name: Controller Temperature
     platform: modbus_controller
@@ -105,21 +100,6 @@ sensor:
     register_type: holding
     value_type: S_WORD
     accuracy_decimals: 1
-
-  # - id: battery_temperature
-  #   name: Battery Temperature
-  #   platform: modbus_controller
-  #   modbus_controller_id: renogy
-  #   address: 0x0103
-  #   bitmask: 0x00FF
-  #   unit_of_measurement: '°C'
-  #   register_type: holding
-  #   value_type: S_WORD
-  #   accuracy_decimals: 1
-
-  #endregion
-
-  #region load
 
   - id: load_voltage
     name: Load Voltage
@@ -155,10 +135,6 @@ sensor:
     value_type: U_WORD
     accuracy_decimals: 1
 
-  #endregion
-
-  #region solar panel
-
   - id: solar_voltage
     name: Solar Voltage
     platform: modbus_controller
@@ -193,10 +169,6 @@ sensor:
     value_type: U_WORD
     accuracy_decimals: 1
 
-  #endregion
-
-  #region status
-
   - id: charging_state
     name: charging_state
     entity_category: diagnostic
@@ -226,10 +198,6 @@ sensor:
       then:
         - component.update: error_state_txt
 
-  #endregion
-
-  #region statistics
-      
   - id: min_battery_voltage_today
     name: Min Battery Voltage
     platform: modbus_controller
@@ -438,7 +406,6 @@ sensor:
   #endregion
 
 switch:
-
   - id: light
     name: Light
     platform: modbus_controller
@@ -448,7 +415,6 @@ switch:
     bitmask: 1
 
 text_sensor:
-
   - id: charging_state_txt
     name: Charging State
     platform: template
