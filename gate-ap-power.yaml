@@ -205,6 +205,9 @@ sensor:
     register_type: holding
     value_type: U_WORD
     bitmask: 1
+    lambda: |-
+      ESP_LOGI("main","Modbus Switch incoming state = %0x",x);
+      return(x);
 
 switch:
   - id: load
