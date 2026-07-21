@@ -32,8 +32,8 @@ web_server:
 
 uart:
   - id: uart_modbus_client
-    tx_pin: 18 # blue
-    rx_pin: 20 # white
+    rx_pin: 18 # blue
+    tx_pin: 20 # white
     baud_rate: 9600
 
 modbus:
