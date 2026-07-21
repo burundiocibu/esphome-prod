@@ -55,6 +55,7 @@ sensor:
     update_interval: 120s
 
   # thank you https://github.com/dgtlcopywrite/renogy-esphome
+  # https://github.com/sdellysse/renogy-modbus-research/tree/main
   - id: battery_soc
     name: Battery State of Charge
     platform: modbus_controller
