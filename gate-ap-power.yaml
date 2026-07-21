@@ -215,7 +215,7 @@ switch:
     register_type: holding
     bitmask: 1
     lambda: |-
-      ESP_LOGD("main","Modbus Switch incoming state = %f",x);
+      ESP_LOGI("main","Modbus Switch incoming state = %f",x);
       return(x);
 
 text_sensor:
