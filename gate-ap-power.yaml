@@ -3,6 +3,9 @@ substitutions:
 
 esphome:
   name: ${me}
+  on_boot:
+    then:
+      - switch.turn_on: load_switch
 
 esp32:
   board: seeed_xiao_esp32c6
@@ -206,12 +209,20 @@ sensor:
     register_type: holding
     value_type: U_WORD
     bitmask: 0x8000
+    on_value:
+      then:
+        - lambda: |-
+            id(load_switch).publish_state(x > 0);
 
-output:
-  - platform: modbus_controller
+switch:
+  - id: load_switch
+    internal: true
+    platform: modbus_controller
     modbus_controller_id: renogy
-    address: 0x10A
-    register_type: coil
+    address: 0x010A
+    register_type: holding
+    bitmask: 0x0001
+    assumed_state: true
     
 text_sensor:
   - id: charging_state_txt
