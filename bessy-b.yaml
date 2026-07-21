@@ -5,8 +5,12 @@ substitutions:
   st_off: 0        # idle -- fan, auger, igniter off
   st_lighting: 1   # sc_light_pot running
   st_heating: 2    # sc_pot_heating running (PID auger cycling)
-  st_cooldown: 3   # go off, fan held on until the pit drops below 175 F
+  st_cooldown: 3   # go off, fan held on until the pit drops below fan_cooldown_temp_f
   st_safe: 4       # latched firepot fault
+
+  # Fan cooldown tuning (fan interlock, go.on_turn_off, sc_shutdown, hot-start check)
+  fan_cooldown_temp_f: "175.0f"    # fan stays on until the pit drops below this
+  fan_cooldown_interval_s: "60"  # seconds between sc_shutdown re-checks
 
   # I/O assignments.
   pin_spi_clk:  GPIO18  # Yellow, row 7
@@ -344,7 +348,7 @@ sensor:
               and:
                 - lambda: "return millis() < 30000;"
                 - switch.is_off: go
-                - lambda: "return x > 175.0f;"
+                - lambda: "return x > ${fan_cooldown_temp_f};"
             then:
               - logger.log: "Hot startup - Fan ON"
               - switch.turn_on: fan
@@ -494,7 +498,7 @@ switch:
     on_turn_off:
       - if:
           condition:
-            lambda: return !isnan(id(smoker_temp_f).state) && id(smoker_temp_f).state > 175.0f;
+            lambda: return !isnan(id(smoker_temp_f).state) && id(smoker_temp_f).state > ${fan_cooldown_temp_f};
           then:
             - logger.log: "Smoker is still hot, keeping fan on"
             - switch.turn_on: fan
@@ -554,7 +558,7 @@ switch:
           then:
             - if:
                 condition:
-                  lambda: return !isnan(id(smoker_temp_f).state) && id(smoker_temp_f).state > 175.0f;
+                  lambda: return !isnan(id(smoker_temp_f).state) && id(smoker_temp_f).state > ${fan_cooldown_temp_f};
                 then:
                   - script.execute:
                       id: sc_set_state
@@ -844,7 +848,7 @@ script:
   # Firepot failed to light, or died during a cook. Latch the SAFE state and turn
   # the system off -- go.on_turn_off runs sc_stop_all_smoking (auger + igniter
   # off), leaves the state alone, and, via the fan interlock, keeps the fan
-  # running until the smoker drops below 175 F.
+  # running until the smoker drops below fan_cooldown_temp_f.
   - id: sc_enter_safe_mode
     mode: single
     then:
@@ -859,12 +863,12 @@ script:
     mode: restart
     then:
       - switch.turn_on: fan
-      - delay: 1200s  # wait 20 minutes before next check
+      - delay: ${fan_cooldown_interval_s}s   # wait fan_cooldown_interval_s (default 20 min) before next check
       - if:
           condition: # grill is still hot
             lambda: |-
               float temp = id(smoker_temp_f).state;
-              return !isnan(temp) && temp > 175.0;
+              return !isnan(temp) && temp > ${fan_cooldown_temp_f};
           then:
             - logger.log: "Smoker is still hot, keeping fan on"
             - switch.turn_on: fan
