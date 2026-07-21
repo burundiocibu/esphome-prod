@@ -42,7 +42,7 @@ modbus:
 
 modbus_controller:
   - id: renogy
-    address: 0xFF
+    address: 1 # 0xFF
     setup_priority: -10
     update_interval: 3s
  
