@@ -5,11 +5,11 @@ substitutions:
   st_off: 0        # idle -- fan, auger, igniter off
   st_lighting: 1   # sc_light_pot running
   st_heating: 2    # sc_pot_heating running (PID auger cycling)
-  st_cooldown: 3   # go off, fan held on until the pit drops below fan_cooldown_temp_f
+  st_cooldown: 3   # go off, fan held on until the fire pot drops below fan_cooldown_temp_f
   st_safe: 4       # latched firepot fault
 
   # Fan cooldown tuning (fan interlock, go.on_turn_off, sc_shutdown, hot-start check)
-  fan_cooldown_temp_f: "175.0f"    # fan stays on until the pit drops below this
+  fan_cooldown_temp_f: "175.0f"    # fan stays on until the fire pot drops below this
   fan_cooldown_interval_s: "60"  # seconds between sc_shutdown re-checks
 
   # I/O assignments.
@@ -43,7 +43,7 @@ esphome:
     priority: -100
     then:
       # Publishes "Ready" via the state machine. The hot-start check lives in
-      # smoker_temp_f.on_value: at this point no sensor has published yet, so a
+      # pot_temp.on_value: at this point no sensor has published yet, so a
       # temperature check here would always see NAN.
       - script.execute:
           id: sc_set_state
@@ -80,6 +80,14 @@ globals:
   # Display overlay: true while the screen is blanked by the inactivity timer.
   # Orthogonal to smoker_state; user inputs check this to decide wake-vs-act.
   - id: display_asleep
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  # One-shot guard for the hot-start check in pot_temp.on_value: the first
+  # valid (non-NAN) temperature reading after boot decides whether we rebooted
+  # into a hot fire pot. (Formerly a millis() < 30s window, but sensor pipelines
+  # plus boot/setup time can exceed that before the first value arrives.)
+  - id: hot_start_checked
     type: bool
     restore_value: no
     initial_value: 'false'
@@ -225,9 +233,37 @@ sensor:
     hot_junction:
       name: "Pot Temperature"
       id: pot_temp
+      device_class: temperature
+      state_class: measurement
+      on_value:
+        then:
+          # Hot-start check: runs once, on the first valid (non-NAN) reading after
+          # boot. on_boot fires before any sensor has published, so a temperature
+          # check there always sees NAN -- do it here instead. If we rebooted
+          # (power blip / OTA / crash) into a hot fire pot with the system off,
+          # get the fan running and start the cooldown watchdog. x is in C.
+          - if:
+              condition:
+                lambda: "return !id(hot_start_checked) && !isnan(x);"
+              then:
+                - lambda: id(hot_start_checked) = true;
+                - if:
+                    condition:
+                      and:
+                        - switch.is_off: go
+                        - lambda: "return (x * 1.8f + 32.0f) > ${fan_cooldown_temp_f};"
+                    then:
+                      - logger.log: "Hot startup - Fan ON"
+                      - switch.turn_on: fan
+                      - script.execute:
+                          id: sc_set_state
+                          new_state: ${st_cooldown}
+                      - script.execute: sc_shutdown
     cold_junction:
       id: tc_ref_temp
       name: tc_ref_temp
+      device_class: temperature
+      state_class: measurement
 
   # ADS1115 — four single-ended channels (A0..A3 referenced to GND).
   # A0-A2: 100kΩ NTC thermistors via 47kΩ bias resistor (3.3V → 47kΩ → node → NTC → GND)
@@ -272,7 +308,9 @@ sensor:
     name: "Probe 0"
     id: ntc_temp_a0
     unit_of_measurement: "°C"
-    accuracy_decimals: 1
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 2
     update_interval: 5s
     lambda: |-
       float v = id(ads_a0).state;
@@ -283,7 +321,9 @@ sensor:
     name: "Probe 1"
     id: ntc_temp_a1
     unit_of_measurement: "°C"
-    accuracy_decimals: 1
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 2
     update_interval: 5s
     lambda: |-
       float v = id(ads_a1).state;
@@ -294,7 +334,9 @@ sensor:
     name: "Probe 2"
     id: ntc_temp_a2
     unit_of_measurement: "°C"
-    accuracy_decimals: 1
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 2
     update_interval: 5s
     lambda: |-
       float v = id(ads_a2).state;
@@ -309,7 +351,9 @@ sensor:
     name: "Smoker Temperature"
     id: smoker_temp
     unit_of_measurement: "°C"
-    accuracy_decimals: 1
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 2
     update_interval: 5s
     lambda: |-
       float v = id(ads_a3).state;
@@ -328,7 +372,9 @@ sensor:
     name: "Smoker Temperature F"
     id: smoker_temp_f
     unit_of_measurement: "°F"
-    accuracy_decimals: 1
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 2
     update_interval: 5s
     lambda: |-
       if (id(smoker_temp).has_state()) {
@@ -336,26 +382,6 @@ sensor:
       } else {
         return NAN;
       }
-    on_value:
-      then:
-        # Hot-start check (runs once, right after boot): on_boot fires before any
-        # sensor has published, so a temperature check there always sees NAN. Do it
-        # here instead -- if we rebooted (power blip / OTA / crash) into a hot
-        # smoker with the system off, get the fan running and start the cooldown
-        # watchdog.
-        - if:
-            condition:
-              and:
-                - lambda: "return millis() < 30000;"
-                - switch.is_off: go
-                - lambda: "return x > ${fan_cooldown_temp_f};"
-            then:
-              - logger.log: "Hot startup - Fan ON"
-              - switch.turn_on: fan
-              - script.execute:
-                  id: sc_set_state
-                  new_state: ${st_cooldown}
-              - script.execute: sc_shutdown
 
   # Keeps the fire pot lit: modulates the igniter based on pot temperature.
   # Re-ignites below pot_lit_threshold, cuts the igniter 25 F above it.
@@ -492,15 +518,15 @@ switch:
     id: fan
     pin: ${pin_relay2}
     restore_mode: ALWAYS_OFF
-    # Hardware interlock: any attempt to turn the fan off while the smoker is hot
-    # is overridden -- the fan runs until it cools. Deliberately publishes NO
+    # Hardware interlock: any attempt to turn the fan off while the fire pot is
+    # hot is overridden -- the fan runs until it cools. Deliberately publishes NO
     # status text; all state/status changes go through sc_set_state.
     on_turn_off:
       - if:
           condition:
-            lambda: return !isnan(id(smoker_temp_f).state) && id(smoker_temp_f).state > ${fan_cooldown_temp_f};
+            lambda: return !isnan(id(pot_temp).state) && (id(pot_temp).state * 1.8f + 32.0f) > ${fan_cooldown_temp_f};
           then:
-            - logger.log: "Smoker is still hot, keeping fan on"
+            - logger.log: "Fire pot is still hot, keeping fan on"
             - switch.turn_on: fan
             - script.execute: sc_shutdown
           else:
@@ -558,7 +584,7 @@ switch:
           then:
             - if:
                 condition:
-                  lambda: return !isnan(id(smoker_temp_f).state) && id(smoker_temp_f).state > ${fan_cooldown_temp_f};
+                  lambda: return !isnan(id(pot_temp).state) && (id(pot_temp).state * 1.8f + 32.0f) > ${fan_cooldown_temp_f};
                 then:
                   - script.execute:
                       id: sc_set_state
@@ -567,7 +593,7 @@ switch:
                   - script.execute:
                       id: sc_set_state
                       new_state: ${st_off}
-      - switch.turn_off: fan   # interlock keeps it running if the smoker is hot
+      - switch.turn_off: fan   # interlock keeps it running if the fire pot is hot
 
 # ===================== PID control (ported from Traeger-D1) =====================
 # Tuning knobs are exposed as numbers so they can be adjusted from Home Assistant;
@@ -848,7 +874,7 @@ script:
   # Firepot failed to light, or died during a cook. Latch the SAFE state and turn
   # the system off -- go.on_turn_off runs sc_stop_all_smoking (auger + igniter
   # off), leaves the state alone, and, via the fan interlock, keeps the fan
-  # running until the smoker drops below fan_cooldown_temp_f.
+  # running until the fire pot drops below fan_cooldown_temp_f.
   - id: sc_enter_safe_mode
     mode: single
     then:
@@ -863,18 +889,18 @@ script:
     mode: restart
     then:
       - switch.turn_on: fan
-      - delay: ${fan_cooldown_interval_s}s   # wait fan_cooldown_interval_s (default 20 min) before next check
+      - delay: ${fan_cooldown_interval_s}s   # wait fan_cooldown_interval_s between re-checks
       - if:
-          condition: # grill is still hot
+          condition: # fire pot is still hot
             lambda: |-
-              float temp = id(smoker_temp_f).state;
-              return !isnan(temp) && temp > ${fan_cooldown_temp_f};
+              float temp_f = id(pot_temp).state * 1.8f + 32.0f;   // pot_temp is in C
+              return !isnan(temp_f) && temp_f > ${fan_cooldown_temp_f};
           then:
-            - logger.log: "Smoker is still hot, keeping fan on"
+            - logger.log: "Fire pot is still hot, keeping fan on"
             - switch.turn_on: fan
             - script.execute: sc_shutdown
           else:
-            - logger.log: "Smoker is now cool, turning off fan"
+            - logger.log: "Fire pot is now cool, turning off fan"
             - switch.turn_off: fan
             - script.stop: sc_shutdown
 
