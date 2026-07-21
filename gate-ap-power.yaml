@@ -57,7 +57,7 @@ sensor:
   #region battery
 
   - id: ${location}_${device}_battery_soc
-    name: $locationName $deviceName Battery State of Charge
+    name: Battery State of Charge
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x0100
@@ -67,7 +67,7 @@ sensor:
     accuracy_decimals: 0
 
   - id: ${location}_${device}_battery_voltage
-    name: $locationName $deviceName Battery Voltage
+    name: Battery Voltage
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x0101
@@ -79,7 +79,7 @@ sensor:
       - multiply: 0.1
 
   - id: ${location}_${device}_battery_current
-    name: $locationName $deviceName Battery Current
+    name: Battery Current
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x0102
@@ -95,7 +95,7 @@ sensor:
   #region temperature
 
   - id: ${location}_${device}_controller_temperature
-    name: $locationName $deviceName Controller Temperature
+    name: Controller Temperature
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x0103
@@ -106,7 +106,7 @@ sensor:
     accuracy_decimals: 1
 
   # - id: ${location}_${device}_battery_temperature
-  #   name: $locationName $deviceName Battery Temperature
+  #   name: Battery Temperature
   #   platform: modbus_controller
   #   modbus_controller_id: renogy
   #   address: 0x0103
@@ -121,7 +121,7 @@ sensor:
   #region load
 
   - id: ${location}_${device}_load_voltage
-    name: $locationName $deviceName Load Voltage
+    name: Load Voltage
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x0104
@@ -133,7 +133,7 @@ sensor:
       - multiply: 0.1
 
   - id: ${location}_${device}_load_current
-    name: $locationName $deviceName Load Current
+    name: Load Current
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x0105
@@ -145,7 +145,7 @@ sensor:
       - multiply: 0.01
 
   - id: ${location}_${device}_load_power
-    name: $locationName $deviceName Load Power
+    name: Load Power
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x0106
@@ -159,7 +159,7 @@ sensor:
   #region solar panel
 
   - id: ${location}_${device}_solar_voltage
-    name: $locationName $deviceName Solar Voltage
+    name: Solar Voltage
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x0107
@@ -171,7 +171,7 @@ sensor:
       - multiply: 0.1
 
   - id: ${location}_${device}_solar_current
-    name: $locationName $deviceName Solar Current
+    name: Solar Current
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x0108
@@ -183,7 +183,7 @@ sensor:
       - multiply: 0.1
 
   - id: ${location}_${device}_solar_power
-    name: $locationName $deviceName Solar Power
+    name: Solar Power
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x0109
@@ -230,7 +230,7 @@ sensor:
   #region statistics
       
   - id: ${location}_${device}_min_battery_voltage_today
-    name: $locationName $deviceName Min Battery Voltage
+    name: Min Battery Voltage
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x010B
@@ -243,7 +243,7 @@ sensor:
       - multiply: 0.1
 
   - id: ${location}_${device}_max_battery_voltage_today
-    name: $locationName $deviceName Max Battery Voltage
+    name: Max Battery Voltage
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x010C
@@ -256,7 +256,7 @@ sensor:
       - multiply: 0.1
 
   - id: ${location}_${device}_max_charging_current_today
-    name: $locationName $deviceName Max Charging Current
+    name: Max Charging Current
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x010D
@@ -269,7 +269,7 @@ sensor:
       - multiply: 0.01
 
   - id: ${location}_${device}_max_discharging_current_today
-    name: $locationName $deviceName Max Discharging Current
+    name: Max Discharging Current
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x010E
@@ -282,7 +282,7 @@ sensor:
       - multiply: 0.01
 
   - id: ${location}_${device}_max_charging_power_today
-    name: $locationName $deviceName Max Charging Power
+    name: Max Charging Power
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x010F
@@ -293,7 +293,7 @@ sensor:
     skip_updates: 1200
 
   - id: ${location}_${device}_max_discharging_power_today
-    name: $locationName $deviceName Max Discharging Power
+    name: Max Discharging Power
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x0110
@@ -304,7 +304,7 @@ sensor:
     skip_updates: 1200
 
   - id: ${location}_${device}_charging_amp_hours_today
-    name: $locationName $deviceName Charged Current
+    name: Charged Current
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x0111
@@ -315,7 +315,7 @@ sensor:
     skip_updates: 1200
 
   - id: ${location}_${device}_discharging_amp_hours_today
-    name: $locationName $deviceName Discharged Current
+    name: Discharged Current
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x0112
@@ -326,7 +326,7 @@ sensor:
     skip_updates: 1200
 
   - id: ${location}_${device}_charging_watt_hours_today
-    name: $locationName $deviceName Charged Power
+    name: Charged Power
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x0113
@@ -339,7 +339,7 @@ sensor:
       - multiply: 10
 
   - id: ${location}_${device}_discharging_watt_hours_today
-    name: $locationName $deviceName Discharged Power
+    name: Discharged Power
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x0114
@@ -352,7 +352,7 @@ sensor:
       - multiply: 10
 
   - id: ${location}_${device}_days_operational
-    name: $locationName $deviceName Days Operational
+    name: Days Operational
     entity_category: diagnostic
     platform: modbus_controller
     modbus_controller_id: renogy
@@ -364,7 +364,7 @@ sensor:
     skip_updates: 1200
 
   - id: ${location}_${device}_battery_over_discharges
-    name: $locationName $deviceName Battery Over-Discharges
+    name: Battery Over-Discharges
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x0116
@@ -374,7 +374,7 @@ sensor:
     skip_updates: 1200
 
   - id: ${location}_${device}_battery_full_charges
-    name: $locationName $deviceName Battery Full Charges
+    name: Battery Full Charges
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x0117
@@ -384,7 +384,7 @@ sensor:
     skip_updates: 1200
 
   - id: ${location}_${device}_charging_amp_hours_total
-    name: $locationName $deviceName Total Charged Current
+    name: Total Charged Current
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x0118
@@ -396,7 +396,7 @@ sensor:
     skip_updates: 1200
 
   - id: ${location}_${device}_discharging_amp_hours_total
-    name: $locationName $deviceName Total Discharged Current
+    name: Total Discharged Current
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x011A
@@ -408,7 +408,7 @@ sensor:
     skip_updates: 1200
 
   - id: ${location}_${device}_charging_watt_hours_total
-    name: $locationName $deviceName Total Charged Power
+    name: Total Charged Power
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x011C
@@ -422,7 +422,7 @@ sensor:
       - multiply: 10
 
   - id: ${location}_${device}_discharging_watt_hours_total
-    name: $locationName $deviceName Total Discharged Power
+    name: Total Discharged Power
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x011E
@@ -439,7 +439,7 @@ sensor:
 switch:
 
   - id: ${location}_${device}_light
-    name: $locationName $deviceName Light
+    name: Light
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x010A
@@ -449,7 +449,7 @@ switch:
 text_sensor:
 
   - id: ${location}_${device}_charging_state
-    name: $locationName $deviceName Charging State
+    name: Charging State
     platform: template
     icon: mdi:battery-charging
     lambda: |-
@@ -464,7 +464,7 @@ text_sensor:
       return {"Unknown"};
 
   - id: ${location}_${device}_error_state
-    name: $locationName $deviceName Error State
+    name: Error State
     entity_category: diagnostic
     platform: template
     icon: mdi:alert
