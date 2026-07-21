@@ -30,7 +30,12 @@ prometheus:
 web_server:
   version: 3
 
-  
+uart:
+  - id: uart_modbus_client
+    tx_pin: 18 # blue
+    rx_pin: 20 # white
+    baud_rate: 115200
+
 sensor:
   - platform: uptime
     name: ${me} uptime
