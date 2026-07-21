@@ -199,8 +199,8 @@ sensor:
         - component.update: error_state_txt
 
 switch:
-  - id: light
-    name: Light
+  - id: load
+    name: Load
     platform: modbus_controller
     modbus_controller_id: renogy
     address: 0x010A
