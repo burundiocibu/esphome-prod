@@ -205,7 +205,6 @@ sensor:
     register_type: holding
     value_type: U_WORD
     bitmask: 1
-    
 
 switch:
   - id: load
@@ -215,6 +214,9 @@ switch:
     address: 0x010A
     register_type: holding
     bitmask: 1
+    lambda: |-
+      ESP_LOGD("main","Modbus Switch incoming state = %f",x);
+      return(x);
 
 text_sensor:
   - id: charging_state_txt
