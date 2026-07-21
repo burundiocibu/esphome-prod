@@ -50,6 +50,10 @@ sensor:
     name: ${me} uptime
     update_interval: 120s
 
+  - platform: wifi_signal
+    name: wifi signal
+    update_interval: 120s
+
   #region battery
 
   - id: ${location}_${device}_battery_soc
