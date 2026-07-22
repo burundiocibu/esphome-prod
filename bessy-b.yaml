@@ -167,28 +167,67 @@ display:
     cs_pin: ${pin_tft_cs}
     dc_pin: ${pin_tft_dc}
     reset_pin: ${pin_tft_rst}
-    update_interval: 0.5s
+    update_interval: 1s
     invert_colors: true
     color_depth: 8BIT
-    data_rate: 40MHz
+    data_rate: 80MHz
     lambda: |-
       auto fg = Color(0, 0, 0);        // black in buffer → white on screen (panel inverts)
       auto bg = Color(255, 255, 255);   // white in buffer → black on screen (panel inverts)
       auto red = Color(255, 0, 0);
-      it.fill(bg);
 
-      it.printf(10, 6, id(roboto), fg, TextAlign::TOP_LEFT, "%s", id(status_msg).state.c_str());
-      it.printf(10, 40, id(roboto), fg, TextAlign::TOP_LEFT, "Fan %s", id(fan).state ? "On" : "Off");
-      it.printf(10, 70, id(roboto), fg, TextAlign::TOP_LEFT, "Igniter %s", id(igniter).state ? "On" : "Off");
-      it.printf(10, 100, id(roboto), fg, TextAlign::TOP_LEFT, "Auger %s", id(auger).state ? "On" : "Off");
-      it.printf(470, 6, id(roboto_pot), red, TextAlign::TOP_RIGHT, "%.0f F", id(pot_temp).state * 1.8f + 32.0f);
+      // Redraw only the fields whose text actually changed since the last frame,
+      // instead of clearing and repainting the whole 480x320 buffer every second.
+      static bool first_run = true;
+      static std::string last_status, last_fan, last_igniter, last_auger;
+      static std::string last_pot, last_set, last_smoker, last_a2, last_a1, last_a0;
 
-      it.printf(240, 70, id(roboto_big), fg, TextAlign::TOP_CENTER, "%.0f F", id(smoker_set_temp).state);
-      it.printf(240, 160, id(roboto_big), fg, TextAlign::TOP_CENTER, "%.0f F", id(smoker_temp_f).state);
+      if (first_run)
+        it.fill(bg);
 
-      it.printf(80,  280, id(roboto), fg, TextAlign::TOP_CENTER, "%.0f F", id(ntc_temp_a2).state * 1.8f + 32.0f);
-      it.printf(240, 280, id(roboto), fg, TextAlign::TOP_CENTER, "%.0f F", id(ntc_temp_a1).state * 1.8f + 32.0f);
-      it.printf(400, 280, id(roboto), fg, TextAlign::TOP_CENTER, "%.0f F", id(ntc_temp_a0).state * 1.8f + 32.0f);
+      auto redraw = [&](std::string &last, const std::string &text, int rx, int ry, int rw, int rh,
+                         int tx, int ty, display::BaseFont *font, Color color, TextAlign align) {
+        if (!first_run && text == last)
+          return;
+        it.filled_rectangle(rx, ry, rw, rh, bg);
+        it.print(tx, ty, font, color, align, text.c_str());
+        last = text;
+      };
+
+      char buf[16];
+
+      redraw(last_status, id(status_msg).state, 10, 6, 460, 30,
+             10, 6, id(roboto), fg, TextAlign::TOP_LEFT);
+
+      redraw(last_fan, id(fan).state ? "Fan On" : "Fan Off", 10, 40, 140, 28,
+             10, 40, id(roboto), fg, TextAlign::TOP_LEFT);
+      redraw(last_igniter, id(igniter).state ? "Igniter On" : "Igniter Off", 10, 70, 180, 28,
+             10, 70, id(roboto), fg, TextAlign::TOP_LEFT);
+      redraw(last_auger, id(auger).state ? "Auger On" : "Auger Off", 10, 100, 160, 28,
+             10, 100, id(roboto), fg, TextAlign::TOP_LEFT);
+
+      snprintf(buf, sizeof(buf), "%.0f F", id(pot_temp).state * 1.8f + 32.0f);
+      redraw(last_pot, buf, 350, 6, 120, 34,
+             470, 6, id(roboto_pot), red, TextAlign::TOP_RIGHT);
+
+      snprintf(buf, sizeof(buf), "%.0f F", id(smoker_set_temp).state);
+      redraw(last_set, buf, 130, 70, 220, 75,
+             240, 70, id(roboto_big), fg, TextAlign::TOP_CENTER);
+      snprintf(buf, sizeof(buf), "%.0f F", id(smoker_temp_f).state);
+      redraw(last_smoker, buf, 130, 160, 220, 75,
+             240, 160, id(roboto_big), fg, TextAlign::TOP_CENTER);
+
+      snprintf(buf, sizeof(buf), "%.0f F", id(ntc_temp_a2).state * 1.8f + 32.0f);
+      redraw(last_a2, buf, 25, 280, 110, 32,
+             80, 280, id(roboto), fg, TextAlign::TOP_CENTER);
+      snprintf(buf, sizeof(buf), "%.0f F", id(ntc_temp_a1).state * 1.8f + 32.0f);
+      redraw(last_a1, buf, 185, 280, 110, 32,
+             240, 280, id(roboto), fg, TextAlign::TOP_CENTER);
+      snprintf(buf, sizeof(buf), "%.0f F", id(ntc_temp_a0).state * 1.8f + 32.0f);
+      redraw(last_a0, buf, 345, 280, 110, 32,
+             400, 280, id(roboto), fg, TextAlign::TOP_CENTER);
+
+      first_run = false;
 
 touchscreen:
   - platform: ft63x6
@@ -234,7 +273,6 @@ sensor:
       name: "Pot Temperature"
       id: pot_temp
       device_class: temperature
-      state_class: measurement
       on_value:
         then:
           # Hot-start check: runs once, on the first valid (non-NAN) reading after
@@ -263,7 +301,6 @@ sensor:
       id: tc_ref_temp
       name: tc_ref_temp
       device_class: temperature
-      state_class: measurement
 
   # ADS1115 — four single-ended channels (A0..A3 referenced to GND).
   # A0-A2: 100kΩ NTC thermistors via 47kΩ bias resistor (3.3V → 47kΩ → node → NTC → GND)
@@ -336,7 +373,6 @@ sensor:
     id: ntc_temp_a0
     unit_of_measurement: "°C"
     device_class: temperature
-    state_class: measurement
     accuracy_decimals: 2
     update_interval: 5s
     lambda: |-
@@ -349,7 +385,6 @@ sensor:
     id: ntc_temp_a1
     unit_of_measurement: "°C"
     device_class: temperature
-    state_class: measurement
     accuracy_decimals: 2
     update_interval: 5s
     lambda: |-
@@ -362,7 +397,6 @@ sensor:
     id: ntc_temp_a2
     unit_of_measurement: "°C"
     device_class: temperature
-    state_class: measurement
     accuracy_decimals: 2
     update_interval: 5s
     lambda: |-
@@ -379,7 +413,6 @@ sensor:
     id: smoker_temp
     unit_of_measurement: "°C"
     device_class: temperature
-    state_class: measurement
     accuracy_decimals: 2
     update_interval: 5s
     lambda: |-
@@ -400,7 +433,6 @@ sensor:
     id: smoker_temp_f
     unit_of_measurement: "°F"
     device_class: temperature
-    state_class: measurement
     accuracy_decimals: 2
     update_interval: 5s
     lambda: |-
