@@ -256,6 +256,7 @@ ads1115:
 text_sensor:
   - platform: version
     name: ${me} ESPHome Version
+
   - platform: template
     name: "Status Message"
     id: status_msg
@@ -273,6 +274,7 @@ sensor:
       name: "Pot Temperature"
       id: pot_temp
       device_class: temperature
+      state_class: measurement
       on_value:
         then:
           # Hot-start check: runs once, on the first valid (non-NAN) reading after
@@ -301,6 +303,7 @@ sensor:
       id: tc_ref_temp
       name: tc_ref_temp
       device_class: temperature
+      state_class: measurement
 
   # ADS1115 — four single-ended channels (A0..A3 referenced to GND).
   # A0-A2: 100kΩ NTC thermistors via 47kΩ bias resistor (3.3V → 47kΩ → node → NTC → GND)
@@ -373,6 +376,7 @@ sensor:
     id: ntc_temp_a0
     unit_of_measurement: "°C"
     device_class: temperature
+    state_class: measurement
     accuracy_decimals: 2
     update_interval: 5s
     lambda: |-
@@ -385,6 +389,7 @@ sensor:
     id: ntc_temp_a1
     unit_of_measurement: "°C"
     device_class: temperature
+    state_class: measurement
     accuracy_decimals: 2
     update_interval: 5s
     lambda: |-
@@ -397,6 +402,7 @@ sensor:
     id: ntc_temp_a2
     unit_of_measurement: "°C"
     device_class: temperature
+    state_class: measurement
     accuracy_decimals: 2
     update_interval: 5s
     lambda: |-
@@ -413,6 +419,7 @@ sensor:
     id: smoker_temp
     unit_of_measurement: "°C"
     device_class: temperature
+    state_class: measurement
     accuracy_decimals: 2
     update_interval: 5s
     lambda: |-
@@ -433,6 +440,7 @@ sensor:
     id: smoker_temp_f
     unit_of_measurement: "°F"
     device_class: temperature
+    state_class: measurement
     accuracy_decimals: 2
     update_interval: 5s
     lambda: |-
