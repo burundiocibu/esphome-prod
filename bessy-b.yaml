@@ -157,7 +157,7 @@ globals:
   - id: tune_timeout_s
     type: float
     restore_value: no
-    initial_value: '3600.0'
+    initial_value: '4800.0'
 
 api:
   encryption:
@@ -290,25 +290,6 @@ display:
              400, 280, id(roboto), fg, TextAlign::TOP_CENTER);
 
       first_run = false;
-
-touchscreen:
-  - platform: ft63x6
-    id: my_touch
-    interrupt_pin: ${pin_ctc_int}
-    reset_pin:
-      number: ${pin_ctc_rst}
-      ignore_strapping_warning: true
-    on_touch:
-      - if:
-          condition:
-            lambda: 'return id(display_asleep);'
-          then:
-            # Asleep: swallow the touch, just wake the display
-            - script.execute: sc_wake
-          else:
-            - lambda: |-
-                id(last_activity_ms) = millis();
-                ESP_LOGI("touch", "Touch at x=%d, y=%d", touch.x, touch.y);
 
 # ADS1115 hub (default address; ADDR->GND = 0x48)
 ads1115:
