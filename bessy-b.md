@@ -235,3 +235,45 @@ Flip PID Autotune on. It bypasses the PID and relays the auger around setpoint; 
 Type the three numbers into pid_pb / pid_ti / pid_td.
 
 A few things that'll bite if ignored: if the temp sits entirely above or below setpoint and never crosses, your HIGH/LOW aren't centered — nudge them (live, via the numbers) and restart. Keep the lid shut with a representative meat load and no wild weather so the tune reflects a real cook. And note the applied duty only updates when the auger loop next reads the globals (≤15 s), while the detector samples at 2 s — negligible phase lag on a multi-minute period, but drop tune_cycle_s if you want it tighter.
+
+
+In the esphome device bessy-b.yaml I have a pid controller for a pellet grill. I need to tune it with an Åström–Hägglund
+ algorythm. Could you add the code to do so?
+
+
+  What I added:
+ - Åström–Hägglund relay autotune state in globals:
+ - HA-exposed tune controls:
+     - Autotune duty HIGH
+     - Autotune duty LOW
+     - Autotune hysteresis (F)
+ - A template switch:
+     - PID Autotune (relay)
+ - A 2-second interval: loop that:
+     - relays the auger duty around the setpoint
+     - measures limit-cycle period/amplitude
+     - computes Ku and Tu
+     - logs suggested pid_pb, pid_ti, pid_td
+ - PID reset handling so normal PID resumes cleanly after autotune
+ - Guarding so sc_pot_heating stops calling sc_pid_control while autotune is active
+
+ Validation:
+ - Ran: ./.venv/bin/esphome config bessy-b.yaml
+ - Result: INFO Configuration is valid!
+
+ How to use it:
+ 1. Start the smoker and let it stabilize near your target temp.
+ 2. Note steady hold duty:
+     - hold duty ≈ augers_heating_on_time / 15
+ 3. Set:
+     - Autotune duty HIGH ≈ hold duty + 0.10 to 0.15
+     - Autotune duty LOW ≈ hold duty - 0.10 to 0.15
+     - keep both within 0.05 .. 0.80
+ 4. Turn on PID Autotune (relay).
+ 5. Watch logs for:
+     - ==== AUTOTUNE COMPLETE ====
+     - suggested pb, ti, td
+ 6. Copy those values into:
+     - PID Proportional Band
+     - PID Ti (Reset Time)
+     - PID Td (Rate Time)

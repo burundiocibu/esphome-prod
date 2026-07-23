@@ -96,6 +96,68 @@ globals:
     type: uint32_t
     restore_value: no
     initial_value: '0'
+  # Request a clean PID state reset on the next control update.
+  - id: pid_reset_requested
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  # Åström–Hägglund relay-autotune state.
+  - id: tune_active
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: tune_relay_low
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: tune_last_up_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: tune_start_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: tune_cmax
+    type: float
+    restore_value: no
+    initial_value: '0.0'
+  - id: tune_cmin
+    type: float
+    restore_value: no
+    initial_value: '0.0'
+  - id: tune_period_sum
+    type: float
+    restore_value: no
+    initial_value: '0.0'
+  - id: tune_amp_sum
+    type: float
+    restore_value: no
+    initial_value: '0.0'
+  - id: tune_good
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: tune_peaks_seen
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: tune_cycle_s
+    type: float
+    restore_value: no
+    initial_value: '15.0'
+  - id: tune_warmup
+    type: int
+    restore_value: no
+    initial_value: '2'
+  - id: tune_target
+    type: int
+    restore_value: no
+    initial_value: '4'
+  - id: tune_timeout_s
+    type: float
+    restore_value: no
+    initial_value: '3600.0'
 
 api:
   encryption:
@@ -619,6 +681,45 @@ switch:
     id: relay_4
     pin: ${pin_relay4}
   - platform: template
+    name: "PID Autotune (relay)"
+    id: pid_autotune
+    optimistic: true
+    turn_on_action:
+      - if:
+          condition:
+            switch.is_on: go
+          then:
+            - lambda: |-
+                id(tune_relay_low) = false;   // start feeding HIGH (assume we're below setpoint)
+                id(tune_last_up_ms) = 0;
+                id(tune_start_ms) = millis();
+                id(tune_cmax) = id(smoker_temp_f).state;
+                id(tune_cmin) = id(smoker_temp_f).state;
+                id(tune_period_sum) = 0.0f;
+                id(tune_amp_sum) = 0.0f;
+                id(tune_good) = 0;
+                id(tune_peaks_seen) = 0;
+                id(tune_active) = true;
+                const float cycle_time = id(tune_cycle_s);
+                id(augers_heating_on_time).publish_state(id(tune_u_high).state * cycle_time);
+                id(augers_heating_off_time).publish_state((1.0f - id(tune_u_high).state) * cycle_time);
+                ESP_LOGI("tune", "Autotune started.");
+          else:
+            - logger.log:
+                level: WARN
+                format: "Start the smoker before enabling PID autotune"
+            - switch.turn_off: pid_autotune
+    turn_off_action:
+      - lambda: |-
+          id(tune_active) = false;
+          id(pid_reset_requested) = true;
+          ESP_LOGI("tune", "Autotune stopped; PID resumes.");
+      - if:
+          condition:
+            switch.is_on: go
+          then:
+            - script.execute: sc_pid_control
+  - platform: template
     name: "System ON⁄OFF"
     id: go
     optimistic: true
@@ -634,6 +735,7 @@ switch:
             - lambda: |-
                 id(display_asleep) = false;
                 id(last_activity_ms) = millis();
+                id(pid_reset_requested) = true;
             - script.stop: sc_shutdown   # a fresh start cancels any cooldown fan watchdog
             - script.execute: sc_pid_control
             - switch.turn_on: fan
@@ -762,6 +864,45 @@ number:
     restore_value: false
     unit_of_measurement: "°F"
 
+  # Åström–Hägglund relay-autotune knobs. HIGH and LOW are the auger duty
+  # fractions bracketing the steady-state hold duty at the chosen setpoint.
+  - platform: template
+    id: tune_u_high
+    name: "Autotune duty HIGH"
+    optimistic: true
+    min_value: 0.05
+    max_value: 0.80
+    step: 0.01
+    initial_value: 0.35
+    restore_value: true
+    mode: box
+    icon: mdi:chart-bell-curve-cumulative
+
+  - platform: template
+    id: tune_u_low
+    name: "Autotune duty LOW"
+    optimistic: true
+    min_value: 0.05
+    max_value: 0.80
+    step: 0.01
+    initial_value: 0.12
+    restore_value: true
+    mode: box
+    icon: mdi:chart-bell-curve-cumulative
+
+  - platform: template
+    id: tune_hyst
+    name: "Autotune hysteresis (F)"
+    optimistic: true
+    min_value: 0.0
+    max_value: 15.0
+    step: 0.5
+    initial_value: 3.0
+    restore_value: true
+    unit_of_measurement: "°F"
+    mode: box
+    icon: mdi:tune-vertical
+
   - platform: template
     name: "Augers Heating ON Time"
     id: augers_heating_on_time
@@ -801,7 +942,13 @@ number:
     unit_of_measurement: "°F"
     mode: slider
     on_value:
-      - script.execute: sc_pid_control
+      - if:
+          condition:
+            and:
+              - switch.is_on: go
+              - lambda: 'return !id(tune_active);'
+          then:
+            - script.execute: sc_pid_control
 
   - platform: template
     name: "Sleep Timeout"
@@ -919,13 +1066,21 @@ script:
           condition:
             - switch.is_on: go
           then:
-            - script.execute: sc_pid_control
+            - if:
+                condition:
+                  lambda: 'return !id(tune_active);'
+                then:
+                  - script.execute: sc_pid_control
             - logger.log:
                 format: "Heating cycle: ON time=%.1fs, OFF time=%.1fs"
                 args: ["id(augers_heating_on_time).state", "id(augers_heating_off_time).state"]
             - switch.turn_on: auger
             - delay: !lambda "return id(augers_heating_on_time).state * 1000;"
-            - script.execute: sc_pid_control
+            - if:
+                condition:
+                  lambda: 'return !id(tune_active);'
+                then:
+                  - script.execute: sc_pid_control
             - switch.turn_off: auger
             - delay: !lambda "return id(augers_heating_off_time).state * 1000;"
 
@@ -933,6 +1088,7 @@ script:
     mode: single
     then:
       - logger.log: "sc_stop_all_smoking executing"
+      - switch.turn_off: pid_autotune
       - script.stop: sc_light_pot
       - script.stop: sc_pot_heating
       - switch.turn_off: igniter
@@ -979,41 +1135,26 @@ script:
       - logger.log: "sc_pid_control.STARTING"
       - lambda: |-
           // Configurable cycle parameters
-          const float cycle_time = 15.0;          // Total cycle time in seconds
-          const float min_multiplier = 0.02;      // Minimum fraction of cycle_time (0.3s)
-          const float max_multiplier = 0.999;     // Maximum fraction of cycle_time (14.985s)
+          const float cycle_time = id(tune_cycle_s);  // Total cycle time in seconds
+          const float min_multiplier = 0.02f;         // Minimum fraction of cycle_time (0.3s)
+          const float max_multiplier = 0.999f;        // Maximum fraction of cycle_time (14.985s)
 
           // Persistent variables
-          static float last_temp = 0.0;           // Last temperature reading
-          static unsigned long last_time = 0;     // Last timestamp in milliseconds
-          static float integral = 0.0;            // Integral term for PID
-          static float last_output = 0.0;         // Last PID output
-          static float last_error = 0.0;          // Last actual error for derivative
-          static float kp = 0.0;                  // Proportional gain
-          static float ki = 0.0;                  // Integral gain
-          static float kd = 0.0;                  // Derivative gain
-          static float set_point = 0.0;           // Current setpoint
-          static unsigned long last_set_time = 0; // Time of last setpoint change
-          static float start_change_temp = 0.0;   // Temp at last setpoint change
-          static bool new_target = false;         // Flag for new setpoint
+          static float last_temp = 0.0f;              // Last temperature reading
+          static unsigned long last_time = 0;         // Last timestamp in milliseconds
+          static float integral = 0.0f;               // Integral term for PID
+          static float last_output = 0.0f;            // Last PID output
+          static float last_error = 0.0f;             // Last actual error for derivative
+          static float kp = 0.0f;                     // Proportional gain
+          static float ki = 0.0f;                     // Integral gain
+          static float kd = 0.0f;                     // Derivative gain
+          static float set_point = 0.0f;              // Current setpoint
+          static unsigned long last_set_time = 0;     // Time of last setpoint change
+          static float start_change_temp = 0.0f;      // Temp at last setpoint change
+          static bool new_target = false;             // Flag for new setpoint
 
           // Get current time in milliseconds
           unsigned long current_time = millis();
-
-          // Handle first run or invalid time
-          if (last_time == 0) {
-              last_time = current_time;
-              ESP_LOGD("PID", "Initializing: current_time = %lu", current_time);
-              return;
-          }
-
-          // Calculate time delta in seconds
-          float dt = (current_time - last_time) / 1000.0;
-          if (dt < 0.001) {
-              ESP_LOGD("PID", "dt too small: %f", dt);
-              last_time = current_time;
-              return;
-          }
 
           // Get sensor values
           float current_temp = id(smoker_temp_f).state;
@@ -1022,6 +1163,43 @@ script:
               ESP_LOGW("PID", "smoker_temp_f is NaN, failing safe (auger off)");
               id(auger).turn_off();
               last_time = current_time;
+              return;
+          }
+
+          if (id(pid_reset_requested)) {
+              last_temp = current_temp;
+              last_time = current_time - 1000UL;  // Start with an effective 1 s dt
+              integral = 0.0f;
+              last_output = 0.0f;
+              last_error = 0.0f;
+              kp = 0.0f;
+              ki = 0.0f;
+              kd = 0.0f;
+              set_point = id(smoker_set_temp).state;
+              last_set_time = current_time;
+              start_change_temp = current_temp;
+              new_target = false;
+              id(pid_reset_requested) = false;
+              ESP_LOGI("PID", "Controller state reset.");
+          }
+
+          // Handle first run or invalid time
+          if (last_time == 0) {
+              last_time = current_time;
+              last_temp = current_temp;
+              set_point = id(smoker_set_temp).state;
+              last_set_time = current_time;
+              start_change_temp = current_temp;
+              ESP_LOGD("PID", "Initializing: current_time = %lu", current_time);
+              return;
+          }
+
+          // Calculate time delta in seconds
+          float dt = (current_time - last_time) / 1000.0f;
+          if (dt < 0.001f) {
+              ESP_LOGD("PID", "dt too small: %f", dt);
+              last_time = current_time;
+              last_temp = current_temp;
               return;
           }
           float pb = id(pid_pb).state;  // Set to 50.0
@@ -1180,6 +1358,92 @@ script:
 # Blank the display after `sleep_timeout` of no input, but only when fully idle
 # (smoker off and not cooling down). Any touch / encoder input wakes it.
 interval:
+  # Åström–Hägglund relay autotune. Relays the auger duty around the current
+  # setpoint, measures the resulting limit cycle, then logs Tyreus-Luyben PID
+  # values in the existing pb/ti/td form.
+  - interval: 2s
+    then:
+      - lambda: |-
+          if (!id(tune_active)) return;
+          if (!id(go).state) {
+            id(pid_autotune).turn_off();
+            return;
+          }
+
+          float t = id(smoker_temp_f).state;
+          float sp = id(smoker_set_temp).state;
+          if (isnan(t)) {
+            id(auger).turn_off();
+            return;
+          }
+
+          uint32_t now = millis();
+          if (now - id(tune_start_ms) > (uint32_t) (id(tune_timeout_s) * 1000.0f)) {
+            ESP_LOGW("tune", "Timed out with no clean limit cycle; aborting.");
+            id(pid_autotune).turn_off();
+            return;
+          }
+
+          float h = id(tune_hyst).state;     // relay hysteresis = epsilon in Ku formula
+          float uh = id(tune_u_high).state;
+          float ul = id(tune_u_low).state;
+
+          // track extrema over the current period
+          if (t > id(tune_cmax)) id(tune_cmax) = t;
+          if (t < id(tune_cmin)) id(tune_cmin) = t;
+
+          // relay with hysteresis, centered on setpoint
+          if (id(tune_relay_low)) {
+            if (t < sp - h) {
+              id(tune_relay_low) = false;
+              if (id(tune_last_up_ms) != 0) {
+                float period = (now - id(tune_last_up_ms)) / 1000.0f;
+                float amp = (id(tune_cmax) - id(tune_cmin)) / 2.0f;
+                id(tune_peaks_seen) += 1;
+                if (id(tune_peaks_seen) > id(tune_warmup)) {
+                  id(tune_period_sum) += period;
+                  id(tune_amp_sum) += amp;
+                  id(tune_good) += 1;
+                  ESP_LOGI("tune", "cycle %d: period=%.1fs amp=%.2fF", (int) id(tune_good), period, amp);
+                } else {
+                  ESP_LOGI("tune", "warmup %d discarded: period=%.1fs amp=%.2fF",
+                           (int) id(tune_peaks_seen), period, amp);
+                }
+              }
+              id(tune_last_up_ms) = now;
+              id(tune_cmax) = t;
+              id(tune_cmin) = t;
+            }
+          } else {
+            if (t > sp + h) id(tune_relay_low) = true;
+          }
+
+          // apply relay output through the existing auger-drive contract
+          float u = id(tune_relay_low) ? ul : uh;
+          float cyc = id(tune_cycle_s);
+          id(augers_heating_on_time).publish_state(u * cyc);
+          id(augers_heating_off_time).publish_state((1.0f - u) * cyc);
+
+          // enough good cycles? compute and finish
+          if (id(tune_good) >= id(tune_target)) {
+            float Tu = id(tune_period_sum) / id(tune_good);
+            float a = id(tune_amp_sum) / id(tune_good);
+            float d = (uh - ul) / 2.0f;
+            float den = a * a - h * h;
+            den = (den > 0.0001f) ? sqrtf(den) : a;  // guard: hysteresis >= amplitude
+            float Ku = (4.0f * d) / (3.14159265f * den);
+
+            float pb = 3.2f / Ku;  // kp = 1/pb = Ku/3.2
+            float ti = 2.2f * Tu;
+            float td = Tu / 6.3f;
+
+            ESP_LOGI("tune", "==== AUTOTUNE COMPLETE ====");
+            ESP_LOGI("tune", "Ku=%.5f duty/F  Tu=%.1fs  a=%.2fF  d=%.3f  h=%.2fF", Ku, Tu, a, d, h);
+            ESP_LOGI("tune", "Tyreus-Luyben ->  pb=%.1f   ti=%.1f   td=%.2f", pb, ti, td);
+            ESP_LOGI("tune", "Type those into pid_pb / pid_ti / pid_td.");
+            id(pid_autotune).turn_off();
+          }
+
   - interval: 5s
     then:
       - if:
