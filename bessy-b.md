@@ -1,6 +1,23 @@
 # bessy-b
 A replacement controller for a pitboss pellet grill
 
+Frist problem: phantom input from the encoder
+1. Flyback diode across the auger relay coil if it doesn't have one already — this is very likely your actual root cause, since the glitch lands right on the relay's turn-off transient.
+2. RC filter on each encoder line (e.g. 100Ω series + 0.1µF to GND at the ESP32 pin) — slews the edge past the noise pulse width without meaningfully affecting detent-speed rotation.
+
+Second problem, Using the ads to sample the PTD. Use a NAU7802 or such
+
+Third prob; display broken?
+
+Forth prob: current sensor is on auger, not igniter.
+
+5th prob: PTD needs to be mounted in the lid or maybe just under the grate in the back
+
+cd ~/git/esphome/config
+claude --resume c9dfa441-d66a-4cd4-b537-9891366a810b
+
+
+## PID Tuning
 
 Running it:
 

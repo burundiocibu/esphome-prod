@@ -824,31 +824,6 @@ number:
     icon: mdi:tune-vertical
 
   - platform: template
-    name: "PID Center Factor"
-    id: pid_center_factor
-    min_value: 0.0
-    max_value: 1.0
-    step: 0.0001
-    initial_value: 0.0
-    optimistic: true
-    restore_value: true
-    mode: box
-    icon: mdi:tune-vertical
-
-  - platform: template
-    name: "PID Stable Window"
-    id: pid_stable_window
-    min_value: 0
-    max_value: 50
-    step: 1
-    initial_value: 8
-    optimistic: true
-    restore_value: true
-    unit_of_measurement: "°F"
-    mode: box
-    icon: mdi:tune-vertical
-
-  - platform: template
     name: "PID Error Temp"
     id: pid_error
     min_value: 0
@@ -1176,8 +1151,8 @@ script:
           float td = id(pid_td).state;  // Set to 5.0
           float tau = id(pid_tau).state;
           float theta = id(pid_theta).state;
-          float center_factor = id(pid_center_factor).state;  // Set to 0.0
-          float stable_window = id(pid_stable_window).state;  // Set to 10.0
+          float center_factor = 0.0
+          float stable_window = 10.0
 
           // Check for setpoint change
           float new_set_point = id(smoker_set_temp).state;
