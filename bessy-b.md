@@ -52,3 +52,17 @@ In the esphome device bessy-b.yaml I have a pid controller for a pellet grill. I
      - PID Proportional Band
      - PID Ti (Reset Time)
      - PID Td (Rate Time)
+
+     [14:57:11.017][S][switch]: 'PID Autotune (relay)' >> ON
+[15:10:04.973][I][tune:1378]: warmup 1 discarded: period=613.3s amp=11.68F
+[15:22:26.516][I][tune:1378]: warmup 2 discarded: period=741.5s amp=18.01F
+[15:33:43.129][I][tune:1376]: cycle 1: period=676.6s amp=18.45F
+[15:44:57.463][I][tune:1376]: cycle 2: period=674.3s amp=14.24F
+[15:57:14.735][I][tune:1376]: cycle 3: period=737.3s amp=11.83F
+[16:08:08.815][I][tune:1376]: cycle 4: period=654.1s amp=19.41F
+[16:08:08.821][I][tune:1409]: ==== AUTOTUNE COMPLETE ====
+[16:08:08.822][I][tune:1410]: Ku=0.01014 duty/F  Tu=685.6s  a=15.98F  d=0.125  h=3.00F
+[16:08:08.822][I][tune:1411]: Tyreus-Luyben ->  pb=315.6   ti=1508.3   td=108.82
+[16:08:08.829][I][tune:1412]: Type those into pid_pb / pid_ti / pid_td.
+[16:08:08.829][I][tune:711]: Autotune stopped; PID resumes.
+[16:08:09.043][S][switch]: 'PID Autotune (relay)' >> OFF

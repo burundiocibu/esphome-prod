@@ -20,7 +20,7 @@ substitutions:
   pin_tft_dc:   GPIO14  # Violet, row 11
   pin_tft_rst:  GPIO13  # Brown,  row 12
   pin_tft_bl:   GPIO5   # White,  row 13
-  pin_rtd_cs:   GPIO16  # Orange, row 14
+  pin_rtd_cs:   GPIO16  # Orange, row 14, unused
   pin_i2c_sda:  GPIO21  # Blue,   row 1  , w 4.7k pullup
   pin_i2c_scl:  GPIO22  # Green,  row 17 , w 4.7k pullup
   pin_analog:   GPIO34  # White,  row 18
@@ -534,6 +534,20 @@ sensor:
           - 0 -> 0
           - 0.33 -> 60
 
+  # Auger drive times — computed by sc_pid_control / the autotune relay and
+  # published via publish_state(); read-only from HA, never user-set.
+  - platform: template
+    name: "Augers Heating ON Time"
+    id: augers_heating_on_time
+    unit_of_measurement: "s"
+    icon: mdi:timer-settings
+
+  - platform: template
+    name: "Augers Heating OFF Time"
+    id: augers_heating_off_time
+    unit_of_measurement: "s"
+    icon: mdi:timer-settings-outline
+
   # Rotary encoder — input-only pins, EXTERNAL pull-ups required (no internal)
   - platform: rotary_encoder
     name: "Encoder"
@@ -747,17 +761,17 @@ switch:
 
 # ===================== PID control (ported from Traeger-D1) =====================
 # Tuning knobs are exposed as numbers so they can be adjusted from Home Assistant;
-# initial values are the "really well" tuned set noted in Traeger-D1.yaml's header comment.
+# initial values are from a tuning session 7/23/26
 number:
   - platform: template
     name: "PID Proportional Band"
     id: pid_pb
     optimistic: true
     min_value: 10
-    max_value: 200
+    max_value: 400
     step: 1
     restore_value: true
-    initial_value: 20.0
+    initial_value: 315.6
     mode: box
     icon: mdi:tune-vertical
 
@@ -765,11 +779,11 @@ number:
     name: "PID Ti (Reset Time)"
     id: pid_ti
     optimistic: true
-    min_value: 0
-    max_value: 600
+    min_value: 120
+    max_value: 1600
     step: 1
     restore_value: true
-    initial_value: 110.0
+    initial_value: 1508.3
     mode: box
     icon: mdi:timer-sync
 
@@ -777,11 +791,11 @@ number:
     name: "PID Td (Rate Time)"
     id: pid_td
     optimistic: true
-    min_value: 0
+    min_value: 10
     max_value: 120
     step: 1
     restore_value: true
-    initial_value: 15.0
+    initial_value: 108.8
     mode: box
     icon: mdi:timer-outline
 
@@ -791,7 +805,7 @@ number:
     min_value: 0
     max_value: 600
     step: 1
-    initial_value: 300
+    initial_value: 480
     optimistic: true
     restore_value: true
     unit_of_measurement: "s"
@@ -800,9 +814,9 @@ number:
     name: "PID Theta"
     id: pid_theta
     min_value: 0
-    max_value: 120
+    max_value: 200
     step: 1
-    initial_value: 12
+    initial_value: 130
     optimistic: true
     restore_value: true
     unit_of_measurement: "s"
@@ -885,32 +899,6 @@ number:
     icon: mdi:tune-vertical
 
   - platform: template
-    name: "Augers Heating ON Time"
-    id: augers_heating_on_time
-    min_value: 3
-    max_value: 20
-    step: 0.5
-    initial_value: 15
-    optimistic: true
-    restore_value: true
-    unit_of_measurement: "s"
-    mode: slider
-    icon: mdi:timer-settings
-
-  - platform: template
-    name: "Augers Heating OFF Time"
-    id: augers_heating_off_time
-    min_value: 0
-    max_value: 20
-    step: 0.5
-    initial_value: 1
-    optimistic: true
-    restore_value: true
-    unit_of_measurement: "s"
-    mode: slider
-    icon: mdi:timer-settings-outline
-
-  - platform: template
     name: "Smoker Set Temperature"
     id: smoker_set_temp
     min_value: 140
@@ -921,7 +909,7 @@ number:
     restore_value: true
     update_interval: 60s
     unit_of_measurement: "°F"
-    mode: slider
+    mode: box
     on_value:
       - if:
           condition:
