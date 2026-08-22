@@ -1,0 +1,9 @@
+*.gbr
+*.zip
+*.drl
+*.pos
+*.lck
+.history
+*.gbrjob
+*.csv
+*.pdf

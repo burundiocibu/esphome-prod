@@ -1,0 +1,4 @@
+(fp_lib_table
+	(version 7)
+	(lib (name "kicad-jcl-lib") (type "KiCad") (uri "${KIPRJMOD}/kicad-jcl-lib.pretty") (options "") (descr ""))
+)
