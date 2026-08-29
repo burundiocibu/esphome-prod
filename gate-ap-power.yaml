@@ -65,4 +65,5 @@ sensor:
       name: "Error code"
     state_of_charge:
       name: "State of charge"
-      
+    panel_power:
+      name: "Panel power"
