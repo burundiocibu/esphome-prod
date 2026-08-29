@@ -61,3 +61,6 @@ sensor:
       name: "Battery voltage"
     battery_current:
       name: "Battery current"
+    error_code:
+      name: "Error code"
+      
