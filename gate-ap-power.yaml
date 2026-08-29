@@ -83,3 +83,5 @@ text_sensor:
       name: "charging mode"
     tracking_mode:
       name: "Tracking mode"
+    device_mode:
+      name: "Device mode"
