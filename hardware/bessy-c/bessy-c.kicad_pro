@@ -60,10 +60,10 @@
           "hatch_smoothing_level": 0,
           "hatch_smoothing_value": 0.1,
           "hatch_thickness": 1.0,
-          "min_clearance": 0.0,
+          "min_clearance": 0.127,
           "min_island_area": 10.0,
-          "min_thickness": 0.25,
-          "pad_connection": 1,
+          "min_thickness": 0.1,
+          "pad_connection": 2,
           "remove_islands": 0,
           "thermal_relief_gap": 0.5,
           "thermal_relief_spoke_width": 0.5
@@ -76,40 +76,7 @@
           "width": 0.0
         }
       ],
-      "drc_exclusions": [
-        [
-          "clearance|93269001|130054601|5a6c5615-affc-4b2a-991f-fdf166847366|79794c7c-8f34-4f4a-a8b9-86f977710fc9",
-          ""
-        ],
-        [
-          "clearance|93269001|134498600|79794c7c-8f34-4f4a-a8b9-86f977710fc9|2cca9b05-94da-433a-91af-f0d219e3adfd",
-          ""
-        ],
-        [
-          "clearance|94146180|131501400|79794c7c-8f34-4f4a-a8b9-86f977710fc9|83be73b6-a5ac-4129-808c-1ffa5547a98f",
-          ""
-        ],
-        [
-          "clearance|94146180|134498600|79794c7c-8f34-4f4a-a8b9-86f977710fc9|1e84bea3-e0d9-4048-abf7-b9652c7204b9",
-          ""
-        ],
-        [
-          "clearance|96853800|131501400|8b5fa8aa-ce91-445a-84d9-78548f7d6bb9|83be73b6-a5ac-4129-808c-1ffa5547a98f",
-          ""
-        ],
-        [
-          "clearance|96853800|134498600|8b5fa8aa-ce91-445a-84d9-78548f7d6bb9|1e84bea3-e0d9-4048-abf7-b9652c7204b9",
-          ""
-        ],
-        [
-          "clearance|96968999|130054601|12586d8b-acdc-4718-92d0-820bdf88fdbd|8b5fa8aa-ce91-445a-84d9-78548f7d6bb9",
-          ""
-        ],
-        [
-          "clearance|96968999|134498600|8b5fa8aa-ce91-445a-84d9-78548f7d6bb9|80c99cec-ae09-4c8f-aead-e4d55b9986c4",
-          ""
-        ]
-      ],
+      "drc_exclusions": [],
       "meta": {
         "version": 2
       },
@@ -195,7 +162,7 @@
         "min_track_width": 0.127,
         "min_via_annular_width": 0.05,
         "min_via_diameter": 0.25,
-        "solder_mask_to_copper_clearance": 0.0,
+        "solder_mask_to_copper_clearance": 0.005,
         "use_height_for_length_calcs": true
       },
       "teardrop_options": [
@@ -275,6 +242,10 @@
         {
           "diameter": 0.0,
           "drill": 0.0
+        },
+        {
+          "diameter": 0.6,
+          "drill": 0.3
         }
       ],
       "zones_allow_external_fillets": false
@@ -286,7 +257,7 @@
       "internal_id": "",
       "mfg": "",
       "mpn": "",
-      "sch_revision": ""
+      "sch_revision": "${REV}"
     },
     "layer_pairs": [
       {
@@ -547,7 +518,7 @@
     "classes": [
       {
         "bus_width": 12,
-        "clearance": 0.127,
+        "clearance": 0.2,
         "diff_pair_gap": 0.25,
         "diff_pair_via_gap": 0.25,
         "diff_pair_width": 0.2,
@@ -558,29 +529,29 @@
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "priority": 2147483647,
         "schematic_color": "rgba(0, 0, 0, 0.000)",
-        "track_width": 0.127,
+        "track_width": 0.2,
         "tuning_profile": "",
-        "via_diameter": 0.25,
-        "via_drill": 0.15,
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
         "wire_width": 6
       },
       {
         "bus_width": 30,
-        "clearance": 0.5,
+        "clearance": 0.2,
         "line_style": 0,
         "name": "+5V",
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "priority": 0,
-        "schematic_color": "rgb(255, 140, 142)",
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
         "track_width": 0.5,
         "tuning_profile": "",
-        "via_diameter": 0.5,
-        "via_drill": 0.25,
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
         "wire_width": 20
       },
       {
         "bus_width": 30,
-        "clearance": 1.8,
+        "clearance": 1.7,
         "diff_pair_gap": 2.0,
         "diff_pair_width": 0.5,
         "line_style": 0,
@@ -691,7 +662,7 @@
           "group_by": true,
           "label": "Value",
           "name": "Value",
-          "show": false
+          "show": true
         },
         {
           "group_by": true,
@@ -769,7 +740,7 @@
           "group_by": false,
           "label": "MPN",
           "name": "MPN",
-          "show": true
+          "show": false
         },
         {
           "group_by": false,
@@ -781,7 +752,7 @@
           "group_by": false,
           "label": "Link",
           "name": "Link",
-          "show": true
+          "show": false
         }
       ],
       "filter_string": "",
@@ -840,7 +811,7 @@
         "uuid": "c88a051a-7ff4-47b0-8510-1f50057c8a94"
       }
     ],
-    "used_designators": "H1-4,R1-21,J1-6,J8-11,#PWR1-19,#PWR22-35,C1-7,Q1-4,U1-5,K1-3",
+    "used_designators": "T1,K1-4,U1-6,Q1-4,D1-4,C1-8,#PWR1-19,#PWR22-41,J1-6,J8-14,R1-25,H1-4",
     "variants": []
   },
   "sheets": [
@@ -849,7 +820,12 @@
       "Root"
     ]
   ],
-  "text_variables": {},
+  "text_variables": {
+    "BOARD_NAME": "Bessy-C",
+    "DESIGNER": "ocibu",
+    "DESIGN_DATE": "2026-08-29",
+    "REV": "1"
+  },
   "tuning_profiles": {
     "meta": {
       "version": 0
