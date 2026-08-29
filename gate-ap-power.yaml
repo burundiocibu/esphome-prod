@@ -67,8 +67,6 @@ sensor:
       name: "State of charge"
     panel_power:
       name: "Panel power"
-    tracking_mode_id:
-      name: "Tracking mode ID"
 
 text_sensor:
   - platform: victron
@@ -83,3 +81,5 @@ text_sensor:
       name: "error"
     charging_mode:
       name: "charging mode"
+    tracking_mode:
+      name: "Tracking mode"
