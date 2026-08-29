@@ -75,8 +75,6 @@ text_sensor:
     victron_id: victron0
     device_type:
       name: "device type"
-    firmware_version_24bit:
-      name: "firmware version"
     serial_number:
       name: "serial number"
     hardware_revision:
