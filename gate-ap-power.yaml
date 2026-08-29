@@ -36,15 +36,6 @@ uart:
     rx_pin: 20 # white
     baud_rate: 9600
 
-modbus:
-  send_wait_time: 50ms
-
-modbus_controller:
-  - id: renogy
-    address: 1 # 0xFF
-    setup_priority: -10
-    update_interval: 3s
- 
 sensor:
   - platform: uptime
     name: ${me} uptime
