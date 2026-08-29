@@ -63,4 +63,6 @@ sensor:
       name: "Battery current"
     error_code:
       name: "Error code"
+    state_of_charge:
+      name: "State of charge"
       
