@@ -69,3 +69,19 @@ sensor:
       name: "Panel power"
     tracking_mode_id:
       name: "Tracking mode ID"
+
+text_sensor:
+  - platform: victron
+    victron_id: victron0
+    device_type:
+      name: "device type"
+    firmware_version_24bit:
+      name: "firmware version"
+    serial_number:
+      name: "serial number"
+    hardware_revision:
+      name: "hardware number"
+    error:
+      name: "error"
+    charging_mode:
+      name: "charging mode"
