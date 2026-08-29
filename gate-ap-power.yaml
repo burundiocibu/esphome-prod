@@ -67,3 +67,5 @@ sensor:
       name: "State of charge"
     panel_power:
       name: "Panel power"
+    tracking_mode_id:
+      name: "Tracking mode ID"
