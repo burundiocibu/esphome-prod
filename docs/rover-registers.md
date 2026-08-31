@@ -1,0 +1,417 @@
+uart:
+  - id: uart_modbus_client
+    tx_pin: 18 # blue
+    rx_pin: 20 # white
+    baud_rate: 9600
+
+modbus:
+  send_wait_time: 50ms
+
+modbus_controller:
+  - id: renogy
+    address: 1 # 0xFF
+    setup_priority: -10
+    update_interval: 3s
+ 
+sensor:
+
+  #region battery
+
+  - id: battery_soc
+    name: Battery State of Charge
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x0100
+    unit_of_measurement: '%'
+    register_type: holding
+    value_type: U_WORD
+    accuracy_decimals: 0
+
+  - id: battery_voltage
+    name: Battery Voltage
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x0101
+    unit_of_measurement: V
+    register_type: holding
+    value_type: U_WORD
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - id: battery_current
+    name: Battery Current
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x0102
+    unit_of_measurement: A
+    register_type: holding
+    value_type: U_WORD
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01
+      
+  - id: controller_temperature
+    name: Controller Temperature
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x0103
+    bitmask: 0xFF00
+    unit_of_measurement: '°C'
+    register_type: holding
+    value_type: S_WORD
+    accuracy_decimals: 1
+
+  - id: load_voltage
+    name: Load Voltage
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x0104
+    unit_of_measurement: V
+    register_type: holding
+    value_type: U_WORD
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - id: load_current
+    name: Load Current
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x0105
+    unit_of_measurement: A
+    register_type: holding
+    value_type: U_WORD
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.01
+
+  - id: load_power
+    name: Load Power
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x0106
+    unit_of_measurement: W
+    register_type: holding
+    value_type: U_WORD
+    accuracy_decimals: 1
+
+  - id: solar_voltage
+    name: Solar Voltage
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x0107
+    unit_of_measurement: V
+    register_type: holding
+    value_type: U_WORD
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - id: solar_current
+    name: Solar Current
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x0108
+    unit_of_measurement: A
+    register_type: holding
+    value_type: U_WORD
+    accuracy_decimals: 2
+    filters:
+      - multiply: 0.1
+
+  - id: solar_power
+    name: Solar Power
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x0109
+    unit_of_measurement: W
+    register_type: holding
+    value_type: U_WORD
+    accuracy_decimals: 1
+
+  - id: charging_state
+    name: charging_state
+    entity_category: diagnostic
+    internal: true
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x0120
+    bitmask: 0x00FF
+    register_type: holding
+    value_type: U_WORD
+    accuracy_decimals: 0
+    on_value:
+      then:
+        - component.update: charging_state_txt
+
+  - id: error_state
+    name: error_state
+    entity_category: diagnostic
+    internal: true
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x0121
+    register_type: holding
+    value_type: U_WORD
+    accuracy_decimals: 0
+    on_value:
+      then:
+        - component.update: error_state_txt
+
+  - id: min_battery_voltage_today
+    name: Min Battery Voltage
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x010B
+    unit_of_measurement: V
+    register_type: holding
+    value_type: U_WORD
+    accuracy_decimals: 1
+    skip_updates: 1200
+    filters:
+      - multiply: 0.1
+
+  - id: max_battery_voltage_today
+    name: Max Battery Voltage
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x010C
+    unit_of_measurement: V
+    register_type: holding
+    value_type: U_WORD
+    accuracy_decimals: 1
+    skip_updates: 1200
+    filters:
+      - multiply: 0.1
+
+  - id: max_charging_current_today
+    name: Max Charging Current
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x010D
+    unit_of_measurement: A
+    register_type: holding
+    value_type: U_WORD
+    accuracy_decimals: 2
+    skip_updates: 1200
+    filters:
+      - multiply: 0.01
+
+  - id: max_discharging_current_today
+    name: Max Discharging Current
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x010E
+    unit_of_measurement: A
+    register_type: holding
+    value_type: U_WORD
+    accuracy_decimals: 2
+    skip_updates: 1200
+    filters:
+      - multiply: 0.01
+
+  - id: max_charging_power_today
+    name: Max Charging Power
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x010F
+    unit_of_measurement: W
+    register_type: holding
+    value_type: U_WORD
+    accuracy_decimals: 1
+    skip_updates: 1200
+
+  - id: max_discharging_power_today
+    name: Max Discharging Power
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x0110
+    unit_of_measurement: W
+    register_type: holding
+    value_type: U_WORD
+    accuracy_decimals: 1
+    skip_updates: 1200
+
+  - id: charging_amp_hours_today
+    name: Charged Current
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x0111
+    unit_of_measurement: AH
+    register_type: holding
+    value_type: U_WORD
+    accuracy_decimals: 1
+    skip_updates: 1200
+
+  - id: discharging_amp_hours_today
+    name: Discharged Current
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x0112
+    unit_of_measurement: AH
+    register_type: holding
+    value_type: U_WORD
+    accuracy_decimals: 1
+    skip_updates: 1200
+
+  - id: charging_watt_hours_today
+    name: Charged Power
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x0113
+    unit_of_measurement: WH
+    register_type: holding
+    value_type: U_WORD
+    accuracy_decimals: 1
+    skip_updates: 1200
+    filters:
+      - multiply: 10
+
+  - id: discharging_watt_hours_today
+    name: Discharged Power
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x0114
+    unit_of_measurement: WH
+    register_type: holding
+    value_type: U_WORD
+    accuracy_decimals: 1
+    skip_updates: 1200
+    filters:
+      - multiply: 10
+
+  - id: days_operational
+    name: Days Operational
+    entity_category: diagnostic
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x0115
+    unit_of_measurement: d
+    register_type: holding
+    value_type: U_WORD
+    accuracy_decimals: 0
+    skip_updates: 1200
+
+  - id: battery_over_discharges
+    name: Battery Over-Discharges
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x0116
+    register_type: holding
+    value_type: U_WORD
+    accuracy_decimals: 0
+    skip_updates: 1200
+
+  - id: battery_full_charges
+    name: Battery Full Charges
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x0117
+    register_type: holding
+    value_type: U_WORD
+    accuracy_decimals: 0
+    skip_updates: 1200
+
+  - id: charging_amp_hours_total
+    name: Total Charged Current
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x0118
+    unit_of_measurement: AH
+    register_type: holding
+    register_count: 2
+    value_type: U_DWORD
+    accuracy_decimals: 1
+    skip_updates: 1200
+
+  - id: discharging_amp_hours_total
+    name: Total Discharged Current
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x011A
+    unit_of_measurement: AH
+    register_type: holding
+    register_count: 2
+    value_type: U_DWORD
+    accuracy_decimals: 1
+    skip_updates: 1200
+
+  - id: charging_watt_hours_total
+    name: Total Charged Power
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x011C
+    unit_of_measurement: WH
+    register_type: holding
+    register_count: 2
+    value_type: U_DWORD
+    accuracy_decimals: 1
+    skip_updates: 1200
+    filters:
+      - multiply: 10
+
+  - id: discharging_watt_hours_total
+    name: Total Discharged Power
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x011E
+    unit_of_measurement: WH
+    register_type: holding
+    register_count: 2
+    value_type: U_DWORD
+    accuracy_decimals: 1
+    skip_updates: 1200
+    filters:
+      - multiply: 10
+
+switch:
+  - id: light
+    name: Light
+    platform: modbus_controller
+    modbus_controller_id: renogy
+    address: 0x010A
+    register_type: holding
+    bitmask: 1
+
+text_sensor:
+  - id: charging_state_txt
+    name: Charging State
+    platform: template
+    icon: mdi:battery-charging
+    lambda: |-
+      auto current_state = (int)id(charging_state).state;
+      if (current_state == 0) return {"Not Charging"};
+      if (current_state == 1) return {"Charging"};
+      if (current_state == 2) return {"Power Point Tracking"};
+      if (current_state == 3) return {"Equalizing"};
+      if (current_state == 4) return {"Boosting"};
+      if (current_state == 5) return {"Floating"};
+      if (current_state == 6) return {"Overpower"};
+      return {"Unknown"};
+
+  - id: error_state_txt
+    name: Error State
+    entity_category: diagnostic
+    platform: template
+    icon: mdi:alert
+    lambda: |-
+      auto current_state = (int)id(error_state).state;
+      if (current_state == 0) return {"Normal"};
+      if (current_state == 1) return {"Battery Over-Discharge"};
+      if (current_state == 2) return {"Battery Over-Voltage"};
+      if (current_state == 4) return {"Battery Under-Voltage"};
+      if (current_state == 8) return {"Load Short Circuit"};
+      if (current_state == 16) return {"Load Over-Power/Over-Current"};
+      if (current_state == 32) return {"Controller Over-Temperature"};
+      if (current_state == 64) return {"Ambient Over-Temperature"};
+      if (current_state == 128) return {"Solar Over-Power"};
+      if (current_state == 256) return {"Solar Short Circuit"};
+      if (current_state == 512) return {"Solar Over-Voltage"};
+      if (current_state == 1024) return {"Solar Counter Current"};
+      if (current_state == 2048) return {"Solar Working Point Over-Voltage"};
+      if (current_state == 4096) return {"Solar Reverse Connection"};
+      if (current_state == 8192) return {"Anti-Reverse MOS Short Circuit"};
+      if (current_state == 16384) return {"Charge MOS Short Circuit"};
+      return {"Unknown"};  
+    
