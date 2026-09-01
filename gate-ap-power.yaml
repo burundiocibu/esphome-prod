@@ -59,14 +59,12 @@ sensor:
     victron_id: victron0
     panel_voltage:
       name: "Panel voltage"
+    panel_power:
+      name: "Panel power"
     battery_voltage:
       name: "Battery voltage"
     battery_current:
       name: "Battery current"
-    panel_power:
-      name: "Panel power"
-    last_full_charge:
-      name: "Last full charge"
     load_current: 
       name: "load_current"
 
