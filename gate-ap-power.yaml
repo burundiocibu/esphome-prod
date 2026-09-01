@@ -69,6 +69,8 @@ sensor:
       name: "Last full charge"
     instantaneous_power:
       name: "instantaneous_power"
+    load_current: 
+      name: "load_current"
 
 text_sensor:
   - platform: victron
