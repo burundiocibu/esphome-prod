@@ -36,8 +36,9 @@ external_components:
 
 uart:
   id: victron_uart
-  rx_pin: GPIO20 # white
-  #tx_pin: GPIO18 # blue
+  # 20=white, 18=blue
+  #rx_pin: GPIO20 # white
+  rx_pin: GPIO18 # blue
   baud_rate: 19200
   rx_buffer_size: 256
 
