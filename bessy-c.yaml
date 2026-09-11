@@ -20,6 +20,8 @@ substitutions:
   pin_tft_dc:   GPIO44  # net tft_dc (ProS3 silkscreen "RX")
   pin_tft_rst:  GPIO38  # net tft_rst
   pin_tft_bl:   GPIO4   # net tft_bl
+  pin_ctc_int:  GPIO35  # net ctc_int (bodge wire, J7 pin 2)
+  pin_ctc_rst:  GPIO37  # net ctc_rst (bodge wire, J7 pin 4)
   pin_i2c_sda:  GPIO21  # net i2c_sda
   pin_i2c_scl:  GPIO5   # net i2c_scl
   pin_enc_a:    GPIO1   # net enc_a
@@ -196,9 +198,10 @@ display:
 touchscreen:
   - platform: ft63x6
     id: my_touch
-    # interrupt_pin / reset_pin removed: on the bessy-c board these only reach
-    # connector J7 pins 2/4 (touch panel FPC) with no trace back to the ESP32 --
-    # both are Optional for ft63x6, so this just polls without IRQ or hard reset.
+    # Not routed on the r1 board -- bodge-wired from J7. With RST floating the
+    # controller never answered at 0x38 (likely held in reset).
+    interrupt_pin: ${pin_ctc_int}
+    reset_pin: ${pin_ctc_rst}
     on_touch:
       - if:
           condition:
