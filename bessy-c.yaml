@@ -49,8 +49,16 @@ esp32:
   framework:
     type: esp-idf
 
+# UM ProS3: 8MB QSPI PSRAM. Holds the full-frame display buffer.
+psram:
+  mode: quad
+  speed: 80MHz
+
 logger:
-  level: INFO
+  level: DEBUG
+  logs:
+    ads1115: INFO
+    ads1115.sensor: INFO
 
 globals:
   # Timestamp (millis) of the last user input; drives the Asleep inactivity timeout.
@@ -160,66 +168,30 @@ display:
     dc_pin: ${pin_tft_dc}
     reset_pin: ${pin_tft_rst}
     update_interval: 1s
-    invert_colors: true
-    color_depth: 8BIT
+    invert_colors: true  # this IPS panel needs INVON to show true colors
+    color_depth: 16BIT   # full-frame buffer (480x320x2 = 300KB) lives in PSRAM
     data_rate: 80MHz
     lambda: |-
-      auto fg = Color(0, 0, 0);        // black in buffer → white on screen (panel inverts)
-      auto bg = Color(255, 255, 255);   // white in buffer → black on screen (panel inverts)
+      auto fg = Color(255, 255, 255);
+      auto bg = Color(0, 0, 0);
       auto red = Color(255, 0, 0);
 
-      // Redraw only the fields whose text actually changed since the last frame,
-      // instead of clearing and repainting the whole 480x320 buffer every second.
-      static bool first_run = true;
-      static std::string last_status, last_fan, last_igniter, last_auger;
-      static std::string last_pot, last_set, last_smoker, last_a2, last_a1, last_a0;
+      it.fill(bg);
 
-      if (first_run)
-        it.fill(bg);
+      it.print(10, 6, id(roboto), fg, TextAlign::TOP_LEFT, id(status_msg).state.c_str());
 
-      auto redraw = [&](std::string &last, const std::string &text, int rx, int ry, int rw, int rh,
-                         int tx, int ty, display::BaseFont *font, Color color, TextAlign align) {
-        if (!first_run && text == last)
-          return;
-        it.filled_rectangle(rx, ry, rw, rh, bg);
-        it.print(tx, ty, font, color, align, text.c_str());
-        last = text;
-      };
+      it.print(10, 40, id(roboto), fg, TextAlign::TOP_LEFT, id(fan).state ? "Fan On" : "Fan Off");
+      it.print(10, 70, id(roboto), fg, TextAlign::TOP_LEFT, id(igniter).state ? "Igniter On" : "Igniter Off");
+      it.print(10, 100, id(roboto), fg, TextAlign::TOP_LEFT, id(auger).state ? "Auger On" : "Auger Off");
 
-      char buf[16];
+      it.printf(470, 6, id(roboto_pot), red, TextAlign::TOP_RIGHT, "%.0f F", id(pot_temp).state * 1.8f + 32.0f);
 
-      redraw(last_status, id(status_msg).state, 10, 6, 460, 30,
-             10, 6, id(roboto), fg, TextAlign::TOP_LEFT);
+      it.printf(240, 70, id(roboto_big), fg, TextAlign::TOP_CENTER, "%.0f F", id(smoker_set_temp).state);
+      it.printf(240, 160, id(roboto_big), fg, TextAlign::TOP_CENTER, "%.0f F", id(smoker_temp_f).state);
 
-      redraw(last_fan, id(fan).state ? "Fan On" : "Fan Off", 10, 40, 140, 28,
-             10, 40, id(roboto), fg, TextAlign::TOP_LEFT);
-      redraw(last_igniter, id(igniter).state ? "Igniter On" : "Igniter Off", 10, 70, 180, 28,
-             10, 70, id(roboto), fg, TextAlign::TOP_LEFT);
-      redraw(last_auger, id(auger).state ? "Auger On" : "Auger Off", 10, 100, 160, 28,
-             10, 100, id(roboto), fg, TextAlign::TOP_LEFT);
-
-      snprintf(buf, sizeof(buf), "%.0f F", id(pot_temp).state * 1.8f + 32.0f);
-      redraw(last_pot, buf, 350, 6, 120, 34,
-             470, 6, id(roboto_pot), red, TextAlign::TOP_RIGHT);
-
-      snprintf(buf, sizeof(buf), "%.0f F", id(smoker_set_temp).state);
-      redraw(last_set, buf, 130, 70, 220, 75,
-             240, 70, id(roboto_big), fg, TextAlign::TOP_CENTER);
-      snprintf(buf, sizeof(buf), "%.0f F", id(smoker_temp_f).state);
-      redraw(last_smoker, buf, 130, 160, 220, 75,
-             240, 160, id(roboto_big), fg, TextAlign::TOP_CENTER);
-
-      snprintf(buf, sizeof(buf), "%.0f F", id(ntc_temp_a2).state * 1.8f + 32.0f);
-      redraw(last_a2, buf, 25, 280, 110, 32,
-             80, 280, id(roboto), fg, TextAlign::TOP_CENTER);
-      snprintf(buf, sizeof(buf), "%.0f F", id(ntc_temp_a1).state * 1.8f + 32.0f);
-      redraw(last_a1, buf, 185, 280, 110, 32,
-             240, 280, id(roboto), fg, TextAlign::TOP_CENTER);
-      snprintf(buf, sizeof(buf), "%.0f F", id(ntc_temp_a0).state * 1.8f + 32.0f);
-      redraw(last_a0, buf, 345, 280, 110, 32,
-             400, 280, id(roboto), fg, TextAlign::TOP_CENTER);
-
-      first_run = false;
+      it.printf(80, 280, id(roboto), fg, TextAlign::TOP_CENTER, "%.0f F", id(ntc_temp_a2).state * 1.8f + 32.0f);
+      it.printf(240, 280, id(roboto), fg, TextAlign::TOP_CENTER, "%.0f F", id(ntc_temp_a1).state * 1.8f + 32.0f);
+      it.printf(400, 280, id(roboto), fg, TextAlign::TOP_CENTER, "%.0f F", id(ntc_temp_a0).state * 1.8f + 32.0f);
 
 touchscreen:
   - platform: ft63x6
