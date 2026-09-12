@@ -508,7 +508,9 @@
   },
   "libraries": {
     "pinned_footprint_libs": [],
-    "pinned_symbol_libs": []
+    "pinned_symbol_libs": [
+      "jcl-sym-lib"
+    ]
   },
   "meta": {
     "filename": "bessy-c.kicad_pro",
@@ -811,7 +813,7 @@
         "uuid": "c88a051a-7ff4-47b0-8510-1f50057c8a94"
       }
     ],
-    "used_designators": "T1,K1-4,U1-6,Q1-4,D1-4,C1-8,#PWR1-19,#PWR22-41,J1-6,J8-14,R1-25,H1-4",
+    "used_designators": "T1,K1-4,U1-6,Q1-4,D1-4,C1-9,#PWR1-19,#PWR22-41,J1-6,J8-14,R1-25,H1-4",
     "variants": []
   },
   "sheets": [
@@ -823,8 +825,8 @@
   "text_variables": {
     "BOARD_NAME": "Bessy-C",
     "DESIGNER": "ocibu",
-    "DESIGN_DATE": "2026-08-29",
-    "REV": "1"
+    "DESIGN_DATE": "2026-09-12",
+    "REV": "2"
   },
   "tuning_profiles": {
     "meta": {
