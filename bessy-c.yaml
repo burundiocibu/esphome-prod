@@ -12,6 +12,9 @@ substitutions:
   fan_cooldown_temp_f: "175.0f"    # fan stays on until the fire pot drops below this
   fan_cooldown_interval_s: "60"  # seconds between sc_shutdown re-checks
 
+  # Encoder set-temperature steps: 5 F below this, 25 F at and above it.
+  set_temp_coarse_from: "250.0f"
+
   # I/O assignments -- from hardware/bessy-c KiCad schematic (U1 = UM ProS3, ESP32-S3).
   pin_spi_clk:  GPIO14  # net spi_clk
   pin_spi_miso: GPIO16  # net spi_miso
@@ -38,6 +41,10 @@ esphome:
   on_boot:
     priority: -100
     then:
+      # NAU7802 PGA bypass (REG 0x1B bit 4). The PGA needs its inputs at least 1.5 V
+      # above AVSS, but the chamber PT100 input sits at 0-0.1 V. Runs after the
+      # driver's register reset; its later 0x1B update only clears bit 6.
+      - lambda: 'id(chamber_raw)->reg(0x1B) |= 0x10;'
       # Publishes "Ready" via the state machine. The hot-start check lives in
       # pot_temp.on_value: at this point no sensor has published yet, so a
       # temperature check here would always see NAN.
@@ -191,9 +198,9 @@ display:
       it.printf(240, 70, id(roboto_big), fg, TextAlign::TOP_CENTER, "%.0f F", id(smoker_set_temp).state);
       it.printf(240, 160, id(roboto_big), fg, TextAlign::TOP_CENTER, "%.0f F", id(smoker_temp_f).state);
 
-      it.printf(80, 280, id(roboto), fg, TextAlign::TOP_CENTER, "%.0f F", id(ntc_temp_a2).state * 1.8f + 32.0f);
-      it.printf(240, 280, id(roboto), fg, TextAlign::TOP_CENTER, "%.0f F", id(ntc_temp_a1).state * 1.8f + 32.0f);
-      it.printf(400, 280, id(roboto), fg, TextAlign::TOP_CENTER, "%.0f F", id(ntc_temp_a0).state * 1.8f + 32.0f);
+      it.printf(80, 280, id(roboto), fg, TextAlign::TOP_CENTER, "%.0f F", id(probe3_temp).state * 1.8f + 32.0f);
+      it.printf(240, 280, id(roboto), fg, TextAlign::TOP_CENTER, "%.0f F", id(probe2_temp).state * 1.8f + 32.0f);
+      it.printf(400, 280, id(roboto), fg, TextAlign::TOP_CENTER, "%.0f F", id(probe1_temp).state * 1.8f + 32.0f);
 
 touchscreen:
   - platform: ft63x6
@@ -214,8 +221,8 @@ touchscreen:
                 id(last_activity_ms) = millis();
                 ESP_LOGI("touch", "Touch at x=%d, y=%d", touch.x, touch.y);
 
-# ADS1115 hubs. ads_hub_ntc: default address (ADDR->GND = 0x48), feeds the NTC/PT100
-# probes below. ads_hub_current: second ADS1115 (U6, hardware/bessy-c), ADDR pulled
+# ADS1115 hubs. ads_hub_ntc: default address (ADDR->GND = 0x48), feeds the NTC
+# probes below (AIN3 is unconnected on bessy-c). ads_hub_current: second ADS1115 (U6, hardware/bessy-c), ADDR pulled
 # to +3.3V = 0x49, dedicated to the igniter current-sense channel.
 ads1115:
   - id: ads_hub_ntc
@@ -276,8 +283,9 @@ sensor:
       device_class: temperature
       state_class: measurement
 
-  # ADS1115 — four single-ended channels (A0..A3 referenced to GND).
-  # A0-A2: 100kΩ NTC thermistors via 47kΩ bias resistor (3.3V → 47kΩ → node → NTC → GND)
+  # ADS1115 — single-ended channels A0..A2 (referenced to GND), one per NTC probe
+  # terminal: A0 = J2 "probe1", A1 = J3 "probe2", A2 = J4 "probe3".
+  # 100kΩ NTC thermistors via 47kΩ bias resistor (3.3V → R4/R5/R6 47kΩ → node → NTC → GND)
   - platform: ads1115
     id: ads_a0
     ads1115_id: ads_hub_ntc
@@ -326,29 +334,28 @@ sensor:
           window_size: 4
           send_every: 4
 
-  # A3: PT100 RTD via 3.0kΩ 0.1% bias resistor (3.3V → 3.0kΩ → node → PT100 → GND)
-  # Self-heating: ~0.1-0.2mW. V range: 0.116V (25°C) to 0.218V (300°C).
-  - platform: ads1115
-    id: ads_a3
-    ads1115_id: ads_hub_ntc
-    multiplexer: A3_GND
-    gain: 0.256
-    sample_rate: 128
-    update_interval: 0.25s      # fast reads (~9ms each) to feed firmware averaging
+  # Chamber PT100 on J5, read by the NAU7802 (U5, 0x2A) on channel 1:
+  # AVDD → R19 (3.3k) → J5.1/VIN1P → PT100 → J5.2/VIN1N → GND. The r1 board has no
+  # J5.2-to-GND connection (J5.2 only reaches VIN1N via R17), so it needs a bodge wire.
+  # AVDD is also the ADC reference (REFP), and the PGA is bypassed in on_boot, so full
+  # scale is ±0.5 * AVDD and counts / 2^24 = R / (R19 + R).
+  - platform: nau7802
+    id: chamber_raw
+    name: chamber_raw
+    gain: 1   # PGA is bypassed, so this has no effect
+    ldo_voltage: 3.0V
+    samples_per_second: 10
+    update_interval: 1s
     filters:
-      # De-spike, then boxcar-average ~20 samples -> one clean value every ~5s.
       - median:
           window_size: 5
           send_every: 5
-      - sliding_window_moving_average:
-          window_size: 4
-          send_every: 4
 
   # NTC temperature sensors — Beta equation: β=3950, R0=100kΩ @ 25°C, R_bias=47kΩ
   # T(K) = 1 / (1/298.15 + ln(R_ntc/100000) / 3950)
   - platform: template
-    name: "Probe 0"
-    id: ntc_temp_a0
+    name: "Probe 1"      # J2
+    id: probe1_temp
     unit_of_measurement: "°C"
     device_class: temperature
     state_class: measurement
@@ -360,8 +367,8 @@ sensor:
       float r = 47000.0f * v / (3.3f - v);
       return 1.0f / (1.0f / 298.15f + logf(r / 100000.0f) / 3950.0f) - 273.15f;
   - platform: template
-    name: "Probe 1"
-    id: ntc_temp_a1
+    name: "Probe 2"      # J3
+    id: probe2_temp
     unit_of_measurement: "°C"
     device_class: temperature
     state_class: measurement
@@ -373,8 +380,8 @@ sensor:
       float r = 47000.0f * v / (3.3f - v);
       return 1.0f / (1.0f / 298.15f + logf(r / 100000.0f) / 3950.0f) - 273.15f;
   - platform: template
-    name: "Probe 2"
-    id: ntc_temp_a2
+    name: "Probe 3"      # J4
+    id: probe3_temp
     unit_of_measurement: "°C"
     device_class: temperature
     state_class: measurement
@@ -386,9 +393,9 @@ sensor:
       float r = 47000.0f * v / (3.3f - v);
       return 1.0f / (1.0f / 298.15f + logf(r / 100000.0f) / 3950.0f) - 273.15f;
 
-  # PT100 RTD temperature — Callendar-Van Dusen inverse (IEC 60751, T ≥ 0°C)
-  # R_ref = 3000Ω (update to measured value for best accuracy)
-  # R_PT = R_ref * V / (3.3 - V); then solve quadratic B*T² + A*T + (1 - R/R0) = 0
+  # Chamber PT100 temperature — Callendar-Van Dusen inverse (IEC 60751, T ≥ 0°C)
+  # x = R / (R19 + R) from the ratiometric NAU7802 reading; R = R19 * x / (1 - x);
+  # then solve quadratic B*T² + A*T + (1 - R/R0) = 0
   - platform: template
     name: "Smoker Temperature"
     id: smoker_temp
@@ -398,10 +405,11 @@ sensor:
     accuracy_decimals: 2
     update_interval: 5s
     lambda: |-
-      float v = id(ads_a3).state;
-      if (v <= 0.0f || v >= 0.255f) return NAN;
-      const float r_ref = 3000.0f;
-      float r = r_ref * v / (3.3f - v);
+      float x = id(chamber_raw).state / 16777216.0f;
+      // ~50 Ω to ~365 Ω; an open probe clips at x = 0.5, a short reads ~0
+      if (isnan(x) || x < 0.015f || x > 0.1f) return NAN;
+      const float r_ref = 3288.0f;   // R19
+      float r = r_ref * x / (1.0f - x);
       const float A = 3.9083e-3f;
       const float B = -5.775e-7f;
       const float R0 = 100.0f;
@@ -498,11 +506,10 @@ sensor:
           // grace window after wake: swallow extra detents from the same gesture
           if (millis() - id(wake_lockout_ms) < 500) return;
           id(last_activity_ms) = millis();
+          // Step up to the next grid point: 5 F grid below the threshold, 25 F from it up.
           float current_temp = id(smoker_set_temp).state;
-          float increment = (current_temp <= 225.0f) ? 5.0f : 25.0f;
-          float new_temp = current_temp + increment;
-          new_temp = (current_temp <= 225.0f) ? roundf(new_temp / 5.0f) * 5.0f
-                                               : roundf(new_temp / 25.0f) * 25.0f;
+          float step = (current_temp < ${set_temp_coarse_from}) ? 5.0f : 25.0f;
+          float new_temp = floorf(current_temp / step) * step + step;
           if (new_temp <= id(smoker_set_temp).traits.get_max_value()) {
             id(smoker_set_temp).publish_state(new_temp);
           }
@@ -515,11 +522,10 @@ sensor:
           // grace window after wake: swallow extra detents from the same gesture
           if (millis() - id(wake_lockout_ms) < 500) return;
           id(last_activity_ms) = millis();
+          // Step down to the next grid point: 25 F grid above the threshold, 5 F at and below it.
           float current_temp = id(smoker_set_temp).state;
-          float increment = (current_temp <= 225.0f) ? -5.0f : -25.0f;
-          float new_temp = current_temp + increment;
-          new_temp = (current_temp <= 225.0f) ? roundf(new_temp / 5.0f) * 5.0f
-                                               : roundf(new_temp / 25.0f) * 25.0f;
+          float step = (current_temp > ${set_temp_coarse_from}) ? 25.0f : 5.0f;
+          float new_temp = ceilf(current_temp / step) * step - step;
           if (new_temp >= id(smoker_set_temp).traits.get_min_value()) {
             id(smoker_set_temp).publish_state(new_temp);
           }
