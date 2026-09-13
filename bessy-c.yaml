@@ -64,7 +64,7 @@ psram:
   speed: 80MHz
 
 logger:
-  level: DEBUG
+  level: INFO
   logs:
     ads1115: INFO
     ads1115.sensor: INFO
@@ -362,10 +362,11 @@ sensor:
     accuracy_decimals: 2
     update_interval: 5s
     lambda: |-
-      float v = id(ads_a0).state;
+      float v = id(ads_a1).state;
       if (v <= 0.0f || v >= 3.2f) return NAN;
       float r = 47000.0f * v / (3.3f - v);
-      return 1.0f / (1.0f / 298.15f + logf(r / 100000.0f) / 3950.0f) - 273.15f;
+      return 1.0f / (1.0f / 298.15f + logf(r / 89689.0f) / 3891.4f) - 273.15f;
+
   - platform: template
     name: "Probe 2"      # J3
     id: probe2_temp
@@ -375,10 +376,14 @@ sensor:
     accuracy_decimals: 2
     update_interval: 5s
     lambda: |-
+      // Calibrated 2026-09-13 (ice 0 °C, boiling 99.04 °C at 979.88 hPa): the nominal
+      // β=3950 / R25=100k read 36.35 F and 214.7 F. The fit also absorbs 3.3 V rail and
+      // 47k tolerance, so it belongs to the probe plugged into J3.
       float v = id(ads_a1).state;
       if (v <= 0.0f || v >= 3.2f) return NAN;
       float r = 47000.0f * v / (3.3f - v);
-      return 1.0f / (1.0f / 298.15f + logf(r / 100000.0f) / 3950.0f) - 273.15f;
+      return 1.0f / (1.0f / 298.15f + logf(r / 89689.0f) / 3891.4f) - 273.15f;
+
   - platform: template
     name: "Probe 3"      # J4
     id: probe3_temp
@@ -388,14 +393,17 @@ sensor:
     accuracy_decimals: 2
     update_interval: 5s
     lambda: |-
-      float v = id(ads_a2).state;
+      float v = id(ads_a1).state;
       if (v <= 0.0f || v >= 3.2f) return NAN;
       float r = 47000.0f * v / (3.3f - v);
-      return 1.0f / (1.0f / 298.15f + logf(r / 100000.0f) / 3950.0f) - 273.15f;
+      return 1.0f / (1.0f / 298.15f + logf(r / 89689.0f) / 3891.4f) - 273.15f;
 
   # Chamber PT100 temperature — Callendar-Van Dusen inverse (IEC 60751, T ≥ 0°C)
-  # x = R / (R19 + R) from the ratiometric NAU7802 reading; R = R19 * x / (1 - x);
+  # x = R / (R19 + R) from the ratiometric NAU7802 reading; R = R19 * x / (1 - x) - R_off;
   # then solve quadratic B*T² + A*T + (1 - R/R0) = 0
+  # Calibrated 2026-09-13: ice bath (0 °C) = 502011 counts, boiling = 677610 counts at
+  # 979.88 hPa (99.04 °C, IAPWS-IF97). Solving R19 * x/(1-x) - R_off = R_PT100(T) at both
+  # points gives R19 = 3392.27 Ω, R_off = 4.635 Ω.
   - platform: template
     name: "Smoker Temperature"
     id: smoker_temp
@@ -408,8 +416,11 @@ sensor:
       float x = id(chamber_raw).state / 16777216.0f;
       // ~50 Ω to ~365 Ω; an open probe clips at x = 0.5, a short reads ~0
       if (isnan(x) || x < 0.015f || x > 0.1f) return NAN;
-      const float r_ref = 3288.0f;   // R19
-      float r = r_ref * x / (1.0f - x);
+      // Two-point calibration (see comment above): effective R19, and an offset that
+      // absorbs lead resistance plus the NAU7802's uncalibrated offset error.
+      const float r_ref = 3392.27f;
+      const float r_off = 4.635f;
+      float r = r_ref * x / (1.0f - x) - r_off;
       const float A = 3.9083e-3f;
       const float B = -5.775e-7f;
       const float R0 = 100.0f;
