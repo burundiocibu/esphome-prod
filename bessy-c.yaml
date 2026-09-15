@@ -156,6 +156,7 @@ light:
     id: display_backlight
     output: tft_backlight
     restore_mode: ALWAYS_ON
+    default_transition_length: 250ms
 
 font:
   - file: "gfonts://Roboto"
@@ -229,6 +230,9 @@ ads1115:
     address: 0x48
   - id: ads_hub_current
     address: 0x49
+    # Only one channel on this hub, so the ADC can free-run: each ct_clamp sample
+    # is then just a result read, with no config write to start a conversion.
+    continuous_mode: true
 
 # ===================== Sensors =====================
 text_sensor:
@@ -362,7 +366,7 @@ sensor:
     accuracy_decimals: 2
     update_interval: 5s
     lambda: |-
-      float v = id(ads_a1).state;
+      float v = id(ads_a0).state;
       if (v <= 0.0f || v >= 3.2f) return NAN;
       float r = 47000.0f * v / (3.3f - v);
       return 1.0f / (1.0f / 298.15f + logf(r / 89689.0f) / 3891.4f) - 273.15f;
@@ -393,7 +397,7 @@ sensor:
     accuracy_decimals: 2
     update_interval: 5s
     lambda: |-
-      float v = id(ads_a1).state;
+      float v = id(ads_a2).state;
       if (v <= 0.0f || v >= 3.2f) return NAN;
       float r = 47000.0f * v / (3.3f - v);
       return 1.0f / (1.0f / 298.15f + logf(r / 89689.0f) / 3891.4f) - 273.15f;
@@ -481,18 +485,22 @@ sensor:
     internal: true
 
   # calibrate_linear assumes a 1000:1 CT ratio (ZMCT102's common spec) with the
-  # 100Ω burden: V_rms = I_primary / 1000 * 100 = I_primary * 0.1. Re-derive from
-  # measured current once the board is running -- see helpers/ for calibration
-  # script conventions.
+  # 100Ω burden: V_rms = I_primary / 1000 * 100 = I_primary * 0.1. Re-derived from
+  # measured current.
   - platform: ct_clamp
     sensor: igniter_current_raw
     name: "Igniter Current"
+    id: igniter_current
+    unit_of_measurement: A
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 3   # ADS1115 at ±0.512 V: ~0.3 mA/LSB after calibration
     sample_duration: 200ms
     update_interval: 5s
     filters:
       - calibrate_linear:
           - 0.0 -> 0.0
-          - 0.1 -> 1.0
+          - 0.25 -> 4.9
 
   # Rotary encoder — input-only pins, EXTERNAL pull-ups required (no internal)
   - platform: rotary_encoder
