@@ -5,11 +5,12 @@ substitutions:
   st_off: 0        # idle -- fan, auger, igniter off
   st_lighting: 1   # sc_light_pot running
   st_heating: 2    # sc_pot_heating running (PID auger cycling)
-  st_cooldown: 3   # go off, fan held on until the fire pot drops below fan_cooldown_temp_f
+  st_cooldown: 3   # go off, fan held on until the chamber drops below fan_cooldown_temp_f
   st_safe: 4       # latched firepot fault
 
-  # Fan cooldown tuning (fan interlock, go.on_turn_off, sc_shutdown, hot-start check)
-  fan_cooldown_temp_f: "175.0f"    # fan stays on until the fire pot drops below this
+  # Fan cooldown tuning (fan interlock, go.on_turn_off, sc_shutdown, hot-start check).
+  # Driven by the chamber PT100 (smoker_temp_f), not the fire pot thermocouple.
+  fan_cooldown_temp_f: "160.0f"    # fan stays on until the chamber drops below this
   fan_cooldown_interval_s: "60"  # seconds between sc_shutdown re-checks
 
   # Encoder set-temperature steps: 5 F below this, 25 F at and above it.
@@ -46,7 +47,7 @@ esphome:
       # driver's register reset; its later 0x1B update only clears bit 6.
       - lambda: 'id(chamber_raw)->reg(0x1B) |= 0x10;'
       # Publishes "Ready" via the state machine. The hot-start check lives in
-      # pot_temp.on_value: at this point no sensor has published yet, so a
+      # smoker_temp_f.on_value: at this point no sensor has published yet, so a
       # temperature check here would always see NAN.
       - script.execute:
           id: sc_set_state
@@ -94,19 +95,25 @@ globals:
     type: bool
     restore_value: no
     initial_value: 'false'
-  # One-shot guard for the hot-start check in pot_temp.on_value: the first
+  # One-shot guard for the hot-start check in smoker_temp_f.on_value: the first
   # valid (non-NAN) temperature reading after boot decides whether we rebooted
-  # into a hot fire pot. (Formerly a millis() < 30s window, but sensor pipelines
+  # into a hot smoker. (Formerly a millis() < 30s window, but sensor pipelines
   # plus boot/setup time can exceed that before the first value arrives.)
   - id: hot_start_checked
     type: bool
     restore_value: no
     initial_value: 'false'
-  # Timestamp (millis) the pot first dropped below the lit threshold during heating.
+  # Timestamp (millis) lit_sense_f first dropped below the lit threshold during heating.
   - id: pot_below_since_ms
     type: uint32_t
     restore_value: no
     initial_value: '0'
+  # lit_sense_f (F) captured when lighting began. "Lit" is a rise above this baseline
+  # rather than an absolute value, so it works from a cold or a sun-warmed start.
+  - id: lighting_start_temp_f
+    type: float
+    restore_value: no
+    initial_value: '0.0f'
 
 api:
   encryption:
@@ -257,30 +264,6 @@ sensor:
       id: pot_temp
       device_class: temperature
       state_class: measurement
-      on_value:
-        then:
-          # Hot-start check: runs once, on the first valid (non-NAN) reading after
-          # boot. on_boot fires before any sensor has published, so a temperature
-          # check there always sees NAN -- do it here instead. If we rebooted
-          # (power blip / OTA / crash) into a hot fire pot with the system off,
-          # get the fan running and start the cooldown watchdog. x is in C.
-          - if:
-              condition:
-                lambda: "return !id(hot_start_checked) && !isnan(x);"
-              then:
-                - lambda: id(hot_start_checked) = true;
-                - if:
-                    condition:
-                      and:
-                        - switch.is_off: go
-                        - lambda: "return (x * 1.8f + 32.0f) > ${fan_cooldown_temp_f};"
-                    then:
-                      - logger.log: "Hot startup - Fan ON"
-                      - switch.turn_on: fan
-                      - script.execute:
-                          id: sc_set_state
-                          new_state: ${st_cooldown}
-                      - script.execute: sc_shutdown
     cold_junction:
       id: tc_ref_temp
       name: tc_ref_temp
@@ -447,25 +430,68 @@ sensor:
       } else {
         return NAN;
       }
+    on_value:
+      then:
+        # Hot-start check: runs once, on the first valid (non-NAN) reading after boot.
+        # on_boot fires before any sensor has published, so a check there always sees
+        # NAN -- do it here instead. If we rebooted (power blip / OTA / crash) into a
+        # hot smoker with the system off, get the fan running and start the cooldown
+        # watchdog. x is already in F.
+        - if:
+            condition:
+              lambda: "return !id(hot_start_checked) && !isnan(x);"
+            then:
+              - lambda: id(hot_start_checked) = true;
+              - if:
+                  condition:
+                    and:
+                      - switch.is_off: go
+                      - lambda: "return x > ${fan_cooldown_temp_f};"
+                  then:
+                    - logger.log: "Hot startup - Fan ON"
+                    - switch.turn_on: fan
+                    - script.execute:
+                        id: sc_set_state
+                        new_state: ${st_cooldown}
+                    - script.execute: sc_shutdown
 
-  # Keeps the fire pot lit: modulates the igniter based on pot temperature.
-  # Re-ignites below pot_lit_threshold, cuts the igniter 25 F above it.
+  # Fire pot "lit" sensing, in F. Everything that decides whether the pot is lit --
+  # sc_light_pot's check, firepot_monitor, the Safe Mode watchdog -- reads this, so
+  # moving to a faster sensor is a one-line change in the lambda. Currently the
+  # chamber PT100, which has a lot of thermal mass. The exhaust NTC (~30 s faster)
+  # or a thermocouple beside the pot can be swapped in; both are in C, so convert.
+  - platform: template
+    name: "Lit Sense Temperature"
+    id: lit_sense_f
+    unit_of_measurement: "°F"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: 5s
+    lambda: |-
+      return id(smoker_temp_f).state;
+      // return id(probe1_temp).state * 1.8f + 32.0f;   // exhaust NTC (J2)
+      // return id(pot_temp).state * 1.8f + 32.0f;      // thermocouple beside the pot
+
+  # Keeps the fire pot lit: modulates the igniter based on lit_sense_f.
+  # Re-ignites below the lit point (lighting baseline + lit_rise_f), cuts the
+  # igniter 25 F above it.
   - platform: template
     name: "Firepot Monitor"
     id: firepot_monitor
     update_interval: 10s
     lambda: |-
-      // Relight band derived from pot_lit_threshold (F): re-ignite below it,
-      // cut the igniter 25 F above it. pot_temp is in C.
-      const float lit_c = (id(pot_lit_threshold).state - 32.0f) / 1.8f;
-      const float cut_c = (id(pot_lit_threshold).state + 25.0f - 32.0f) / 1.8f;
-      if (id(go).state) {
-        if (id(pot_temp).state < lit_c) {
+      // Relight band around the lit point (baseline at lighting + lit_rise_f), all in F:
+      // re-ignite below it, cut the igniter 25 F above it.
+      const float lit_f = id(lighting_start_temp_f) + id(lit_rise_f).state;
+      const float sense_f = id(lit_sense_f).state;
+      if (id(go).state && !isnan(sense_f)) {
+        if (sense_f < lit_f) {
           if (!id(igniter).state) {
             id(igniter).turn_on();
           }
           return 1.0f;
-        } else if (id(pot_temp).state > cut_c) {
+        } else if (sense_f > lit_f + 25.0f) {
           id(igniter).turn_off();
           return 0.0f;
         }
@@ -594,15 +620,15 @@ switch:
     id: fan
     pin: ${pin_relay2}
     restore_mode: ALWAYS_OFF
-    # Hardware interlock: any attempt to turn the fan off while the fire pot is
+    # Hardware interlock: any attempt to turn the fan off while the chamber is
     # hot is overridden -- the fan runs until it cools. Deliberately publishes NO
     # status text; all state/status changes go through sc_set_state.
     on_turn_off:
       - if:
           condition:
-            lambda: return !isnan(id(pot_temp).state) && (id(pot_temp).state * 1.8f + 32.0f) > ${fan_cooldown_temp_f};
+            lambda: return !isnan(id(smoker_temp_f).state) && id(smoker_temp_f).state > ${fan_cooldown_temp_f};
           then:
-            - logger.log: "Fire pot is still hot, keeping fan on"
+            - logger.log: "Smoker is still hot, keeping fan on"
             - switch.turn_on: fan
             - script.execute: sc_shutdown
           else:
@@ -659,7 +685,7 @@ switch:
           then:
             - if:
                 condition:
-                  lambda: return !isnan(id(pot_temp).state) && (id(pot_temp).state * 1.8f + 32.0f) > ${fan_cooldown_temp_f};
+                  lambda: return !isnan(id(smoker_temp_f).state) && id(smoker_temp_f).state > ${fan_cooldown_temp_f};
                 then:
                   - script.execute:
                       id: sc_set_state
@@ -799,7 +825,7 @@ number:
   - platform: template
     name: "Smoker Set Temperature"
     id: smoker_set_temp
-    min_value: 140
+    min_value: 160
     max_value: 550
     step: 5
     initial_value: 225
@@ -825,12 +851,12 @@ number:
     icon: mdi:sleep
 
   - platform: template
-    name: "Firepot Lit Threshold"
-    id: pot_lit_threshold
-    min_value: 100
-    max_value: 500
+    name: "Firepot Lit Rise"
+    id: lit_rise_f
+    min_value: 10
+    max_value: 150
     step: 5
-    initial_value: 300
+    initial_value: 40
     optimistic: true
     restore_value: true
     unit_of_measurement: "°F"
@@ -841,9 +867,9 @@ number:
     name: "Firepot Fail Timeout"
     id: firepot_fail_timeout
     min_value: 60
-    max_value: 1200
+    max_value: 1800
     step: 30
-    initial_value: 300
+    initial_value: 900
     optimistic: true
     restore_value: true
     unit_of_measurement: "s"
@@ -883,6 +909,10 @@ script:
           then:
             - delay: 0.01s   # prevents race conditions from occurring
             - logger.log: "Lighting fire pot now"
+            - lambda: |-
+                // Baseline for the rise-based lit check below.
+                float f = id(lit_sense_f).state;
+                id(lighting_start_temp_f) = isnan(f) ? 70.0f : f;
             - switch.turn_on: igniter
             - switch.turn_on: auger
             - delay: 90s # load up pellets
@@ -890,7 +920,7 @@ script:
             # keep the pot going until lit
             - switch.turn_off: auger
             - repeat:
-                count: 3
+                count: 6
                 then:
                   - logger.log:
                       format: "Keeping pot lit. Lighting cycle counter = %d"
@@ -899,10 +929,12 @@ script:
                   - switch.turn_on: auger
                   - delay: 30s
                   - switch.turn_off: auger
-            # done lighting -- only declare the pot lit if it actually got hot
+            # done lighting -- only declare the pot lit if lit_sense_f actually climbed
             - if:
                 condition:
-                  lambda: 'return (id(pot_temp).state * 1.8f + 32.0f) >= id(pot_lit_threshold).state;'
+                  lambda: |-
+                    float f = id(lit_sense_f).state;
+                    return !isnan(f) && f >= id(lighting_start_temp_f) + id(lit_rise_f).state;
                 then:
                   # flash -- overwritten by the HEATING transition below
                   - lambda: id(status_msg).publish_state("Pot Lit");
@@ -913,10 +945,10 @@ script:
                   - script.execute: sc_pot_heating
                   - delay: 300s
                   # hold the igniter on for 5 minutes after the pot is lit, then let it go
-                  # (firepot_monitor may already have turned it off at lit threshold + 25 F)
+                  # (firepot_monitor may already have turned it off at the lit point + 25 F)
                   - switch.turn_off: igniter
                 else:
-                  - logger.log: "Firepot never reached lit threshold -> Safe Mode"
+                  - logger.log: "Lit sensor never rose to the lit threshold -> Safe Mode"
                   - script.execute: sc_enter_safe_mode
 
   - id: sc_pot_heating
@@ -949,7 +981,7 @@ script:
   # Firepot failed to light, or died during a cook. Latch the SAFE state and turn
   # the system off -- go.on_turn_off runs sc_stop_all_smoking (auger + igniter
   # off), leaves the state alone, and, via the fan interlock, keeps the fan
-  # running until the fire pot drops below fan_cooldown_temp_f.
+  # running until the chamber drops below fan_cooldown_temp_f.
   - id: sc_enter_safe_mode
     mode: single
     then:
@@ -966,16 +998,16 @@ script:
       - switch.turn_on: fan
       - delay: ${fan_cooldown_interval_s}s   # wait fan_cooldown_interval_s between re-checks
       - if:
-          condition: # fire pot is still hot
+          condition: # chamber is still hot
             lambda: |-
-              float temp_f = id(pot_temp).state * 1.8f + 32.0f;   // pot_temp is in C
+              float temp_f = id(smoker_temp_f).state;   // chamber PT100, already in F
               return !isnan(temp_f) && temp_f > ${fan_cooldown_temp_f};
           then:
-            - logger.log: "Fire pot is still hot, keeping fan on"
+            - logger.log: "Smoker is still hot, keeping fan on"
             - switch.turn_on: fan
             - script.execute: sc_shutdown
           else:
-            - logger.log: "Fire pot is now cool, turning off fan"
+            - logger.log: "Smoker is now cool, turning off fan"
             - switch.turn_off: fan
             - script.stop: sc_shutdown
 
@@ -1200,7 +1232,7 @@ interval:
           then:
             - script.execute: sc_sleep
 
-  # Firepot watchdog: while actively heating, if the pot stays below the lit
+  # Firepot watchdog: while actively heating, if lit_sense_f stays below the lit
   # threshold longer than firepot_fail_timeout, drop into Safe Mode.
   - interval: 10s
     then:
@@ -1211,8 +1243,9 @@ interval:
             id(pot_below_since_ms) = 0;
             return;
           }
-          float pot_f = id(pot_temp).state * 1.8f + 32.0f;
-          if (pot_f >= id(pot_lit_threshold).state) {
+          const float lit_f = id(lighting_start_temp_f) + id(lit_rise_f).state;
+          float sense_f = id(lit_sense_f).state;
+          if (!isnan(sense_f) && sense_f >= lit_f) {
             id(pot_below_since_ms) = 0;   // hot enough -- reset the fault timer
             return;
           }
@@ -1222,7 +1255,7 @@ interval:
             return;
           }
           if (now - id(pot_below_since_ms) > (uint32_t) (id(firepot_fail_timeout).state * 1000.0f)) {
-            ESP_LOGW("firepot", "Pot below %.0f F for too long -> Safe Mode", id(pot_lit_threshold).state);
+            ESP_LOGW("firepot", "Lit sensor below %.0f F for too long -> Safe Mode", lit_f);
             id(sc_enter_safe_mode).execute();
           }
 
