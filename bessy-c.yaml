@@ -9,9 +9,18 @@ substitutions:
   st_safe: 4       # latched firepot fault
 
   # Fan cooldown tuning (fan interlock, go.on_turn_off, sc_shutdown, hot-start check).
-  # Driven by the chamber PT100 (smoker_temp_f), not the fire pot thermocouple.
+  # Driven by cooldown_temp_f: the fire pot thermocouple, with the chamber PT100 as a
+  # backstop if it drops out.
   fan_cooldown_temp_f: "160.0f"    # fan stays on until the chamber drops below this
   fan_cooldown_interval_s: "60"  # seconds between sc_shutdown re-checks
+
+  # Igniter health. A sound element draws ~1.6 A at ~121 V (about 76 ohm); anything
+  # under igniter_min_current with the relay closed is an open element, a dead relay
+  # or a loose wire. ct_clamp integrates 200 ms every 5 s, so the sample that straddles
+  # the relay closing reads low (it is the ~0.4 A / "300 ohm" spike in Grafana) --
+  # igniter_settle_ms drops it.
+  igniter_min_current: "1.0f"
+  igniter_settle_ms: "6000"
 
   # Encoder set-temperature steps: 5 F below this, 25 F at and above it.
   set_temp_coarse_from: "250.0f"
@@ -47,7 +56,7 @@ esphome:
       # driver's register reset; its later 0x1B update only clears bit 6.
       - lambda: 'id(chamber_raw)->reg(0x1B) |= 0x10;'
       # Publishes "Ready" via the state machine. The hot-start check lives in
-      # smoker_temp_f.on_value: at this point no sensor has published yet, so a
+      # cooldown_temp_f.on_value: at this point no sensor has published yet, so a
       # temperature check here would always see NAN.
       - script.execute:
           id: sc_set_state
@@ -95,7 +104,7 @@ globals:
     type: bool
     restore_value: no
     initial_value: 'false'
-  # One-shot guard for the hot-start check in smoker_temp_f.on_value: the first
+  # One-shot guard for the hot-start check in cooldown_temp_f.on_value: the first
   # valid (non-NAN) temperature reading after boot decides whether we rebooted
   # into a hot smoker. (Formerly a millis() < 30s window, but sensor pipelines
   # plus boot/setup time can exceed that before the first value arrives.)
@@ -106,6 +115,19 @@ globals:
   # Timestamp (millis) lit_sense_f first dropped below the lit threshold during heating.
   - id: pot_below_since_ms
     type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  # Igniter current accumulator: summed over one on-window, averaged at turn-off.
+  - id: igniter_on_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: igniter_sum_a
+    type: float
+    restore_value: no
+    initial_value: '0.0f'
+  - id: igniter_samples
+    type: uint16_t
     restore_value: no
     initial_value: '0'
   # lit_sense_f (F) captured when lighting began. "Lit" is a rise above this baseline
@@ -437,6 +459,44 @@ sensor:
       } else {
         return NAN;
       }
+
+  # Fire pot "lit" sensing, in F. Everything that decides whether the pot is lit --
+  # sc_light_pot's check, firepot_monitor, the Safe Mode watchdog -- reads this, so
+  # moving to another sensor is a one-line change in the lambda. Currently the
+  # thermocouple beside the fire pot; the alternatives are left commented below.
+  - platform: template
+    name: "Lit Sense Temperature"
+    id: lit_sense_f
+    unit_of_measurement: "°F"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: 5s
+    lambda: |-
+      float c = id(pot_temp).state;                     // thermocouple beside the pot
+      // A dead or disconnected amp reads far outside anything the pot can do; NaN
+      // here stalls the watchdog timer, which trips Safe Mode -- the intent.
+      if (isnan(c) || c < -20.0f || c > 1000.0f) return NAN;
+      return c * 1.8f + 32.0f;
+      // return id(smoker_temp_f).state;                // chamber PT100
+      // return id(probe1_temp).state * 1.8f + 32.0f;   // exhaust NTC (J2)
+
+  # What the cooldown logic watches, in F. Cooldown runs the fan to burn off the
+  # pellets left in the fire pot, so this is the pot thermocouple and only the pot:
+  # once the pot is cold the burn is done and the fan can stop, however hot the
+  # chamber still is. The chamber PT100 stands in only when the thermocouple reads
+  # invalid, so a dead probe cannot look like a cold pot and stop the fan early.
+  - platform: template
+    name: "Cooldown Temperature"
+    id: cooldown_temp_f
+    unit_of_measurement: "°F"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    update_interval: 5s
+    lambda: |-
+      float pot = id(lit_sense_f).state;          // thermocouple beside the pot
+      return isnan(pot) ? id(smoker_temp_f).state : pot;
     on_value:
       then:
         # Hot-start check: runs once, on the first valid (non-NAN) reading after boot.
@@ -461,24 +521,6 @@ sensor:
                         id: sc_set_state
                         new_state: ${st_cooldown}
                     - script.execute: sc_shutdown
-
-  # Fire pot "lit" sensing, in F. Everything that decides whether the pot is lit --
-  # sc_light_pot's check, firepot_monitor, the Safe Mode watchdog -- reads this, so
-  # moving to a faster sensor is a one-line change in the lambda. Currently the
-  # chamber PT100, which has a lot of thermal mass. The exhaust NTC (~30 s faster)
-  # or a thermocouple beside the pot can be swapped in; both are in C, so convert.
-  - platform: template
-    name: "Lit Sense Temperature"
-    id: lit_sense_f
-    unit_of_measurement: "°F"
-    device_class: temperature
-    state_class: measurement
-    accuracy_decimals: 1
-    update_interval: 5s
-    lambda: |-
-      return id(smoker_temp_f).state;
-      // return id(probe1_temp).state * 1.8f + 32.0f;   // exhaust NTC (J2)
-      // return id(pot_temp).state * 1.8f + 32.0f;      // thermocouple beside the pot
 
   # Keeps the fire pot lit: modulates the igniter based on lit_sense_f.
   # Re-ignites below the lit point (lighting baseline + lit_rise_f), cuts the
@@ -528,12 +570,37 @@ sensor:
     device_class: current
     state_class: measurement
     accuracy_decimals: 3   # ADS1115 at ±0.512 V: ~0.3 mA/LSB after calibration
-    sample_duration: 200ms
+    sample_duration: 1000ms
     update_interval: 5s
     filters:
       - calibrate_linear:
           - 0.0 -> 0.0
           - 0.25 -> 4.9
+    on_value:
+      - lambda: |-
+          // Only samples fully inside the on-window count: the straddling sample at
+          // turn-on is skipped by igniter_settle_ms, and the one at turn-off arrives
+          // after the relay has opened, so the state check below drops it.
+          if (!id(igniter).state) return;
+          if (millis() - id(igniter_on_ms) < ${igniter_settle_ms}) return;
+          bool healthy = x >= ${igniter_min_current};
+          id(igniter_fault).publish_state(!healthy);
+          if (!healthy) return;   // a faulted element must not drag the average down
+          id(igniter_sum_a) += x;
+          id(igniter_samples) += 1;
+
+  # One value per light: the mean current while the igniter was on, published at
+  # turn-off. Per-sample current scatters 5-8%, so a single reading says nothing about
+  # element health; averaged over a ~5 minute light it is good to ~1.5%. Divide line
+  # voltage by this in HA to trend the element's resistance (~76 ohm when sound).
+  - platform: template
+    name: "Igniter Mean Current"
+    id: igniter_mean_current
+    unit_of_measurement: A
+    device_class: current
+    state_class: measurement
+    accuracy_decimals: 3
+    update_interval: never   # published by igniter.on_turn_off
 
   # Rotary encoder — input-only pins, EXTERNAL pull-ups required (no internal)
   - platform: rotary_encoder
@@ -584,6 +651,16 @@ sensor:
 
 # ===================== Inputs =====================
 binary_sensor:
+  # Igniter commanded on but drawing no real current -- open element, failed relay or
+  # a loose wire. delayed_on needs two consecutive bad samples, so one odd reading
+  # cannot raise it. Reporting only; nothing acts on it yet.
+  - platform: template
+    name: "Igniter Fault"
+    id: igniter_fault
+    device_class: problem
+    filters:
+      - delayed_on: 12s
+
   - platform: gpio
     name: "Encoder Button"
     id: encoder_button
@@ -633,7 +710,7 @@ switch:
     on_turn_off:
       - if:
           condition:
-            lambda: return !isnan(id(smoker_temp_f).state) && id(smoker_temp_f).state > ${fan_cooldown_temp_f};
+            lambda: return !isnan(id(cooldown_temp_f).state) && id(cooldown_temp_f).state > ${fan_cooldown_temp_f};
           then:
             - logger.log: "Smoker is still hot, keeping fan on"
             - switch.turn_on: fan
@@ -657,6 +734,21 @@ switch:
     id: igniter
     pin: ${pin_relay3}
     restore_mode: ALWAYS_OFF
+    on_turn_on:
+      - lambda: |-
+          id(igniter_on_ms) = millis();
+          id(igniter_sum_a) = 0.0f;
+          id(igniter_samples) = 0;
+          id(igniter_fault).publish_state(false);
+    on_turn_off:
+      - lambda: |-
+          if (id(igniter_samples) > 0) {
+            id(igniter_mean_current).publish_state(id(igniter_sum_a) / id(igniter_samples));
+          } else {
+            // Too short to sample, or every sample was faulted.
+            id(igniter_mean_current).publish_state(NAN);
+          }
+          id(igniter_fault).publish_state(false);
   # relay_4 removed: bessy-c only has 3 relays (K1-K3, auger/fan/igniter) -- no
   # 4th relay net exists on this board.
   - platform: template
@@ -692,7 +784,7 @@ switch:
           then:
             - if:
                 condition:
-                  lambda: return !isnan(id(smoker_temp_f).state) && id(smoker_temp_f).state > ${fan_cooldown_temp_f};
+                  lambda: return !isnan(id(cooldown_temp_f).state) && id(cooldown_temp_f).state > ${fan_cooldown_temp_f};
                 then:
                   - script.execute:
                       id: sc_set_state
@@ -861,11 +953,15 @@ number:
     name: "Firepot Lit Rise"
     id: lit_rise_f
     min_value: 10
-    max_value: 150
+    max_value: 400   # headroom: the pot thermocouple swings far more than the chamber did
     step: 5
-    initial_value: 40
+    # 100 F suits the pot thermocouple: it crosses that ~2:45 into a light and sits
+    # 120 F or more above baseline while heating, well clear of the +/-8 F of sun
+    # drift. Deliberately NOT restored -- this threshold decides Safe Mode, so the
+    # YAML stays the source of truth and a stale stored value can't quietly weaken it.
+    initial_value: 100
     optimistic: true
-    restore_value: true
+    restore_value: false
     unit_of_measurement: "°F"
     mode: box
     icon: mdi:fire
@@ -924,18 +1020,28 @@ script:
             - switch.turn_on: auger
             - delay: 90s # load up pellets
 
-            # keep the pot going until lit
+            # Feed the pot in 60 s cycles until it lights, up to 6 of them. Once
+            # lit_sense_f has risen, the remaining iterations skip their body and
+            # fall through immediately -- ESPHome has no loop break. Stopping as
+            # soon as the fire is established avoids the overfeed that used to
+            # push the chamber past the setpoint right after ignition.
             - switch.turn_off: auger
             - repeat:
                 count: 6
                 then:
-                  - logger.log:
-                      format: "Keeping pot lit. Lighting cycle counter = %d"
-                      args: ['iteration + 1']
-                  - delay: 30s
-                  - switch.turn_on: auger
-                  - delay: 30s
-                  - switch.turn_off: auger
+                  - if:
+                      condition:
+                        lambda: |-
+                          float f = id(lit_sense_f).state;
+                          return isnan(f) || f < id(lighting_start_temp_f) + id(lit_rise_f).state;
+                      then:
+                        - logger.log:
+                            format: "Keeping pot lit. Lighting cycle counter = %d"
+                            args: ['iteration + 1']
+                        - delay: 30s
+                        - switch.turn_on: auger
+                        - delay: 30s
+                        - switch.turn_off: auger
             # done lighting -- only declare the pot lit if lit_sense_f actually climbed
             - if:
                 condition:
@@ -1007,7 +1113,7 @@ script:
       - if:
           condition: # chamber is still hot
             lambda: |-
-              float temp_f = id(smoker_temp_f).state;   // chamber PT100, already in F
+              float temp_f = id(cooldown_temp_f).state;   // pot thermocouple, already in F
               return !isnan(temp_f) && temp_f > ${fan_cooldown_temp_f};
           then:
             - logger.log: "Smoker is still hot, keeping fan on"
