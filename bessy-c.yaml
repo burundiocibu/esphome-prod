@@ -264,6 +264,13 @@ sensor:
       id: pot_temp
       device_class: temperature
       state_class: measurement
+      # Calibrated 2026-09-24 with the replacement probe (ice bath 0 C, boiling
+      # 99.04 C at 979.88 hPa): it read 48 F and 196 F. That is a 20% span error,
+      # which is a lot for a K-type probe -- see if it holds on the next cal run.
+      filters:
+        - calibrate_linear:
+            - 8.89 -> 0.0
+            - 91.11 -> 99.04
     cold_junction:
       id: tc_ref_temp
       name: tc_ref_temp
