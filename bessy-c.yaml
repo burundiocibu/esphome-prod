@@ -197,6 +197,15 @@ font:
   - file: "gfonts://Roboto"
     id: roboto_big
     size: 60
+  # Material Design Icons, three glyphs only -- the whole font is ~7000 icons, so
+  # the glyph list is what keeps it small. Codepoints from the MDI metadata:
+  # fan F0210, grain F0D7C (auger), heating-coil F1AAF (igniter).
+  - file:
+      type: web
+      url: "https://github.com/Templarian/MaterialDesign-Webfont/raw/master/fonts/materialdesignicons-webfont.ttf"
+    id: icons
+    size: 36
+    glyphs: ["\U000F0210", "\U000F0D7C", "\U000F1AAF"]
 
 display:
   - platform: mipi_spi
@@ -219,9 +228,12 @@ display:
 
       it.print(10, 6, id(roboto), fg, TextAlign::TOP_LEFT, id(status_msg).state.c_str());
 
-      it.print(10, 40, id(roboto), fg, TextAlign::TOP_LEFT, id(fan).state ? "Fan On" : "Fan Off");
-      it.print(10, 70, id(roboto), fg, TextAlign::TOP_LEFT, id(igniter).state ? "Igniter On" : "Igniter Off");
-      it.print(10, 100, id(roboto), fg, TextAlign::TOP_LEFT, id(auger).state ? "Auger On" : "Auger Off");
+      // Relay state, left to right: fan, igniter, auger. Lit when on, dim when off;
+      // the igniter glows red because it is the one that is actually hot.
+      auto dim = Color(70, 70, 70);
+      it.print(14, 44, id(icons), id(fan).state ? fg : dim, TextAlign::TOP_LEFT, "\U000F0210");
+      it.print(62, 44, id(icons), id(igniter).state ? red : dim, TextAlign::TOP_LEFT, "\U000F1AAF");
+      it.print(110, 44, id(icons), id(auger).state ? fg : dim, TextAlign::TOP_LEFT, "\U000F0D7C");
 
       it.printf(470, 6, id(roboto_pot), red, TextAlign::TOP_RIGHT, "%.0f F", id(pot_temp).state * 1.8f + 32.0f);
 
@@ -702,6 +714,7 @@ switch:
   - platform: gpio
     name: "Fan"
     id: fan
+    icon: mdi:fan
     pin: ${pin_relay2}
     restore_mode: ALWAYS_OFF
     # Hardware interlock: any attempt to turn the fan off while the chamber is
@@ -727,11 +740,13 @@ switch:
   - platform: gpio
     name: "Auger"
     id: auger
+    icon: mdi:grain
     pin: ${pin_relay1}
     restore_mode: ALWAYS_OFF
   - platform: gpio
     name: "Igniter"
     id: igniter
+    icon: mdi:heating-coil
     pin: ${pin_relay3}
     restore_mode: ALWAYS_OFF
     on_turn_on:
