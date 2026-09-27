@@ -21,6 +21,7 @@ substitutions:
   # igniter_settle_ms drops it.
   igniter_min_current: "1.0f"
   igniter_settle_ms: "6000"
+  igniter_stale_ms: "120000"   # no valid current reading for this long -> flag the sensor
 
   # Encoder set-temperature steps: 5 F below this, 25 F at and above it.
   set_temp_coarse_from: "250.0f"
@@ -114,6 +115,11 @@ globals:
     initial_value: 'false'
   # Timestamp (millis) lit_sense_f first dropped below the lit threshold during heating.
   - id: pot_below_since_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  # Timestamp (millis) of the last valid igniter_current reading; 0 until the first.
+  - id: igniter_current_ok_ms
     type: uint32_t
     restore_value: no
     initial_value: '0'
@@ -271,6 +277,13 @@ ads1115:
     address: 0x48
   - id: ads_hub_current
     address: 0x49
+    # 2026-09-25: this hub stopped answering conversion reads the moment the igniter
+    # relay closed and stayed silent for 46 hours (igniter_current NAN throughout)
+    # until a reboot, while the MCP9600 on the same bus kept working. Possibly an
+    # interaction between the chip and the ESPHome driver rather than the chip alone:
+    # in continuous mode the driver writes the config register once at setup and never
+    # again, so nothing re-initialises it, and a failed read is only ever retried as-is.
+    # igniter_current_stale exists so the next occurrence is not silent.
     # Only one channel on this hub, so the ADC can free-run: each ct_clamp sample
     # is then just a result read, with no config write to start a conversion.
     continuous_mode: true
@@ -593,6 +606,11 @@ sensor:
           // Only samples fully inside the on-window count: the straddling sample at
           // turn-on is skipped by igniter_settle_ms, and the one at turn-off arrives
           // after the relay has opened, so the state check below drops it.
+          // NAN means the ADS1115 read failed, which says nothing about the element --
+          // do not let a dead sensor look like a dead igniter. igniter_current_ok_ms
+          // feeds the staleness check below.
+          if (isnan(x)) return;
+          id(igniter_current_ok_ms) = millis();
           if (!id(igniter).state) return;
           if (millis() - id(igniter_on_ms) < ${igniter_settle_ms}) return;
           bool healthy = x >= ${igniter_min_current};
@@ -672,6 +690,14 @@ binary_sensor:
     device_class: problem
     filters:
       - delayed_on: 12s
+
+  # The current sense is the whole point of the igniter monitoring, so a sensor that
+  # quietly stops reporting has to be visible. See the note on ads_hub_current.
+  - platform: template
+    name: "Igniter Current Stale"
+    id: igniter_current_stale
+    device_class: problem
+    entity_category: diagnostic
 
   - platform: gpio
     name: "Encoder Button"
@@ -1359,6 +1385,21 @@ interval:
               - lambda: 'return (millis() - id(last_activity_ms)) > (uint32_t) (id(sleep_timeout).state * 1000.0f);'
           then:
             - script.execute: sc_sleep
+
+  # Igniter current sense watchdog: flags a sensor that has stopped publishing valid
+  # readings, whether or not the igniter is in use. ${igniter_stale_ms} of silence is
+  # far longer than the 5 s update interval, so this only catches a real dropout.
+  - interval: 60s
+    then:
+      - lambda: |-
+          const uint32_t last_ok = id(igniter_current_ok_ms);
+          // last_ok == 0 means it has never read: stale once past the grace window.
+          bool stale = (millis() - last_ok) > ${igniter_stale_ms};
+          if (stale && !id(igniter_current_stale).state) {
+            ESP_LOGW("igniter", "No valid igniter current for %.0f s -- ADS1115 at 0x49 not reading",
+                     (millis() - last_ok) / 1000.0f);
+          }
+          id(igniter_current_stale).publish_state(stale);
 
   # Firepot watchdog: while actively heating, if lit_sense_f stays below the lit
   # threshold longer than firepot_fail_timeout, drop into Safe Mode.
