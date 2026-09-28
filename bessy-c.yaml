@@ -23,6 +23,10 @@ substitutions:
   igniter_settle_ms: "6000"
   igniter_stale_ms: "120000"   # no valid current reading for this long -> flag the sensor
 
+  # Auger duty cycle: sc_pot_heating runs the auger for auger_feed_rate of each
+  # cycle of this length.
+  auger_cycle_s: "15.0"
+
   # Encoder set-temperature steps: 5 F below this, 25 F at and above it.
   set_temp_coarse_from: "250.0f"
 
@@ -86,6 +90,11 @@ globals:
     type: uint32_t
     restore_value: no
     initial_value: '0'
+  # auger_feed_rate latched at the start of the current sc_pot_heating cycle.
+  - id: auger_cycle_rate
+    type: float
+    restore_value: no
+    initial_value: '0.0'
   # Timestamp (millis) of the last wake; a brief grace window after this swallows
   # the extra encoder detents that a single wake gesture emits.
   - id: wake_lockout_ms
@@ -936,31 +945,19 @@ number:
     restore_value: false
     unit_of_measurement: "°F"
 
+  # Fraction of each ${auger_cycle_s} s cycle the auger runs while heating.
+  # Written by the PID; settable by hand for testing.
   - platform: template
-    name: "Augers Heating ON Time"
-    id: augers_heating_on_time
-    min_value: 3
-    max_value: 20
-    step: 0.5
-    initial_value: 15
+    name: "Auger Feed Rate"
+    id: auger_feed_rate
+    min_value: 0.0
+    max_value: 1.0
+    step: 0.01
+    initial_value: 0.5
     optimistic: true
     restore_value: true
-    unit_of_measurement: "s"
     mode: slider
-    icon: mdi:timer-settings
-
-  - platform: template
-    name: "Augers Heating OFF Time"
-    id: augers_heating_off_time
-    min_value: 0
-    max_value: 20
-    step: 0.5
-    initial_value: 1
-    optimistic: true
-    restore_value: true
-    unit_of_measurement: "s"
-    mode: slider
-    icon: mdi:timer-settings-outline
+    icon: mdi:grain
 
   - platform: template
     name: "Smoker Set Temperature"
@@ -1114,14 +1111,23 @@ script:
             - switch.is_on: go
           then:
             - script.execute: sc_pid_control
+            # Latch the rate for this cycle so the ON and OFF halves always sum to
+            # one full cycle, even if the PID updates it mid-cycle.
+            - lambda: |-
+                float rate = id(auger_feed_rate).state;
+                id(auger_cycle_rate) = isnan(rate) ? 0.0f : std::clamp(rate, 0.0f, 1.0f);
             - logger.log:
-                format: "Heating cycle: ON time=%.1fs, OFF time=%.1fs"
-                args: ["id(augers_heating_on_time).state", "id(augers_heating_off_time).state"]
-            - switch.turn_on: auger
-            - delay: !lambda "return id(augers_heating_on_time).state * 1000;"
+                format: "Heating cycle: feed rate=%.2f"
+                args: ["id(auger_cycle_rate)"]
+            - if:
+                condition:
+                  lambda: "return id(auger_cycle_rate) > 0.0f;"
+                then:
+                  - switch.turn_on: auger
+                  - delay: !lambda "return id(auger_cycle_rate) * ${auger_cycle_s} * 1000;"
             - script.execute: sc_pid_control
             - switch.turn_off: auger
-            - delay: !lambda "return id(augers_heating_off_time).state * 1000;"
+            - delay: !lambda "return (1.0f - id(auger_cycle_rate)) * ${auger_cycle_s} * 1000;"
 
   - id: sc_stop_all_smoking
     mode: single
@@ -1173,9 +1179,7 @@ script:
       - logger.log: "sc_pid_control.STARTING"
       - lambda: |-
           // Configurable cycle parameters
-          const float cycle_time = 15.0;          // Total cycle time in seconds
-          const float min_multiplier = 0.02;      // Minimum fraction of cycle_time (0.3s)
-          const float max_multiplier = 0.999;     // Maximum fraction of cycle_time (14.985s)
+          const float cycle_time = ${auger_cycle_s};  // Auger cycle time in seconds
 
           // Persistent variables
           static float last_temp = 0.0;           // Last temperature reading
@@ -1312,20 +1316,9 @@ script:
               integral = 0.0;
           }
 
-          // Calculate on and off times
-          float new_on_time = u * cycle_time;
-          float new_off_time = (1.0 - u) * cycle_time;
-
-          // Apply constraints
-          float min_time = cycle_time * min_multiplier;
-          float max_time = cycle_time * max_multiplier;
-          new_on_time = std::max(min_time, std::min(max_time, new_on_time));
-          new_off_time = std::max(min_time, std::min(max_time, new_off_time));
-
           // Publish states
           id(pid_error).publish_state(error);
-          id(augers_heating_on_time).publish_state(new_on_time);
-          id(augers_heating_off_time).publish_state(new_off_time);
+          id(auger_feed_rate).publish_state(u);
 
           // Update last values
           last_temp = current_temp;
@@ -1335,8 +1328,8 @@ script:
 
           // Debug logging
           ESP_LOGD("PID", "dt: %.3f", dt);
-          ESP_LOGD("PID", "CurrentTemp: %.3f, SetPoint: %.3f, Output: %.3f, OnTime: %.3f, OffTime: %.3f",
-                  current_temp, set_point, u, new_on_time, new_off_time);
+          ESP_LOGD("PID", "CurrentTemp: %.3f, SetPoint: %.3f, Output: %.3f",
+                  current_temp, set_point, u);
           ESP_LOGD("PID", "P: %.3f, I: %.3f, D: %.3f, Center: %.3f", p, i, d, center);
           ESP_LOGD("PID", "PredErr: %.3f, IntSum: %.3f, Tau: %.3f, Theta: %.3f",
                   predicted_error, integral, tau, theta);
