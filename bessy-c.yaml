@@ -308,7 +308,7 @@ display:
       it.printf(470, 6, id(roboto_pot), red, TextAlign::TOP_RIGHT, "%.0f F", id(pot_temp).state * 1.8f + 32.0f);
 
       it.printf(240, 70, id(roboto_big), fg, TextAlign::TOP_CENTER, "%.0f F", id(smoker_pid).target_temperature * 1.8f + 32.0f);
-      it.printf(240, 160, id(roboto_big), fg, TextAlign::TOP_CENTER, "%.0f F", id(smoker_temp_f).state);
+      it.printf(240, 160, id(roboto_big), fg, TextAlign::TOP_CENTER, "%.0f F", id(smoker_temp).state * 1.8f + 32.0f);
 
       it.printf(80, 280, id(roboto), fg, TextAlign::TOP_CENTER, "%.0f F", id(probe3_temp).state * 1.8f + 32.0f);
       it.printf(240, 280, id(roboto), fg, TextAlign::TOP_CENTER, "%.0f F", id(probe2_temp).state * 1.8f + 32.0f);
@@ -533,23 +533,6 @@ sensor:
       if (disc < 0.0f) return NAN;
       return (-A + sqrtf(disc)) / (2.0f * B);
 
-  # Smoker temperature in Fahrenheit, for the display and Home Assistant. smoker_pid
-  # works from smoker_temp in C.
-  - platform: template
-    name: "Smoker Temperature F"
-    id: smoker_temp_f
-    unit_of_measurement: "°F"
-    device_class: temperature
-    state_class: measurement
-    accuracy_decimals: 2
-    update_interval: 5s
-    lambda: |-
-      if (id(smoker_temp).has_state()) {
-        return id(smoker_temp).state * 1.8f + 32.0f;
-      } else {
-        return NAN;
-      }
-
   # smoker_pid internals, for tuning. The pid sensor publishes every value x100.
   # Error is converted back to F; the terms and result are in percent of the PID's
   # 0-1 output, before auger_feed_output scales it to a feed rate.
@@ -604,7 +587,7 @@ sensor:
       // here stalls the watchdog timer, which trips Safe Mode -- the intent.
       if (isnan(c) || c < -20.0f || c > 1000.0f) return NAN;
       return c * 1.8f + 32.0f;
-      // return id(smoker_temp_f).state;                // chamber PT100
+      // return id(smoker_temp).state * 1.8f + 32.0f;   // chamber PT100
       // return id(probe1_temp).state * 1.8f + 32.0f;   // exhaust NTC (J2)
 
   # What the cooldown logic watches, in F. Cooldown runs the fan to burn off the
@@ -622,7 +605,7 @@ sensor:
     update_interval: 5s
     lambda: |-
       float pot = id(lit_sense_f).state;          // thermocouple beside the pot
-      return isnan(pot) ? id(smoker_temp_f).state : pot;
+      return isnan(pot) ? id(smoker_temp).state * 1.8f + 32.0f : pot;
     on_value:
       then:
         # Hot-start check: runs once, on the first valid (non-NAN) reading after boot.
