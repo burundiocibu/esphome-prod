@@ -26,8 +26,24 @@ substitutions:
   # Auger duty cycle: sc_pot_heating runs the auger for auger_feed_rate of each
   # cycle of this length.
   auger_cycle_s: "15.0"
+  # The PID's 0-1 output is scaled onto this feed-rate range. The floor keeps the
+  # fire fed while the chamber is over temperature; full feed is for grilling.
+  # Changing the range changes the loop gain: rescale pid_kp/ki/kd by old/new span.
+  auger_feed_min: "0.05"
+  auger_feed_max: "1.0"
+  # PID autotune hysteresis, in C: the chamber must pass the setpoint by this much
+  # before the autotuner switches the feed, so flame noise can't cause false swings.
+  pid_autotune_noiseband: "1.0"
+  # Autotune "feed high" PID output. Tuning matters for smoking (200-275 F), where
+  # feed runs well under full. At feed 0.80 the chamber heated in ~2.5 min but took
+  # ~8 min to cool at the floor, and the autotuner flagged the result as unreliable.
+  # About twice the steady-state output (~0.15, feed ~0.2 at 225 F) evens them out.
+  pid_autotune_high_output: "0.3"
 
-  # Encoder set-temperature steps: 5 F below this, 25 F at and above it.
+  # Set-temperature range, and encoder steps: 5 F below set_temp_coarse_from, 25 F
+  # at and above it.
+  set_temp_min_f: "160"
+  set_temp_max_f: "550"
   set_temp_coarse_from: "250.0f"
 
   # I/O assignments -- from hardware/bessy-c KiCad schematic (U1 = UM ProS3, ESP32-S3).
@@ -90,6 +106,11 @@ globals:
     type: uint32_t
     restore_value: no
     initial_value: '0'
+  # Set by the PID Autotune button; cleared once the result is copied to pid_kp/ki/kd.
+  - id: pid_autotune_active
+    type: bool
+    restore_value: no
+    initial_value: 'false'
   # auger_feed_rate latched at the start of the current sc_pot_heating cycle.
   - id: auger_cycle_rate
     type: float
@@ -194,6 +215,40 @@ output:
     pin: ${pin_tft_bl}
     id: tft_backlight
 
+  # smoker_pid's heat output. min_power/max_power scale its 0-1 onto the feed range;
+  # with zero_means_zero off, a PID output of 0 still feeds at auger_feed_min.
+  - platform: template
+    id: auger_feed_output
+    type: float
+    min_power: ${auger_feed_min}
+    max_power: ${auger_feed_max}
+    write_action:
+      - lambda: id(auger_feed_rate).publish_state(state);
+
+climate:
+  # Chamber temperature controller. sc_set_state puts it in HEAT only while the
+  # smoker is HEATING; the rest of the time it is OFF and the auger is left to the
+  # lighting sequence. The target is the smoker set temperature.
+  - platform: pid
+    id: smoker_pid
+    name: "Smoker"
+    sensor: smoker_temp
+    default_target_temperature: 225°F
+    heat_output: auger_feed_output
+    visual:
+      min_temperature: ${set_temp_min_f}°F
+      max_temperature: ${set_temp_max_f}°F
+      temperature_step:
+        target_temperature: 0.5
+        current_temperature: 0.1
+    control_parameters:
+      kp: 0.0096
+      ki: 0.000034
+      kd: 1.82
+      min_integral: 0.0
+      max_integral: 1.0
+      derivative_averaging_samples: 3
+
 light:
   - platform: monochromatic
     name: "Display Backlight"
@@ -252,7 +307,7 @@ display:
 
       it.printf(470, 6, id(roboto_pot), red, TextAlign::TOP_RIGHT, "%.0f F", id(pot_temp).state * 1.8f + 32.0f);
 
-      it.printf(240, 70, id(roboto_big), fg, TextAlign::TOP_CENTER, "%.0f F", id(smoker_set_temp).state);
+      it.printf(240, 70, id(roboto_big), fg, TextAlign::TOP_CENTER, "%.0f F", id(smoker_pid).target_temperature * 1.8f + 32.0f);
       it.printf(240, 160, id(roboto_big), fg, TextAlign::TOP_CENTER, "%.0f F", id(smoker_temp_f).state);
 
       it.printf(80, 280, id(roboto), fg, TextAlign::TOP_CENTER, "%.0f F", id(probe3_temp).state * 1.8f + 32.0f);
@@ -478,7 +533,8 @@ sensor:
       if (disc < 0.0f) return NAN;
       return (-A + sqrtf(disc)) / (2.0f * B);
 
-  # Smoker temperature in Fahrenheit -- PID control loop (ported from Traeger-D1) is tuned in °F
+  # Smoker temperature in Fahrenheit, for the display and Home Assistant. smoker_pid
+  # works from smoker_temp in C.
   - platform: template
     name: "Smoker Temperature F"
     id: smoker_temp_f
@@ -493,6 +549,42 @@ sensor:
       } else {
         return NAN;
       }
+
+  # smoker_pid internals, for tuning. The pid sensor publishes every value x100.
+  # Error is converted back to F; the terms and result are in percent of the PID's
+  # 0-1 output, before auger_feed_output scales it to a feed rate.
+  - platform: pid
+    climate_id: smoker_pid
+    name: "PID Error"
+    type: ERROR
+    unit_of_measurement: "°F"
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.018   # C x100 -> F
+  - platform: pid
+    climate_id: smoker_pid
+    name: "PID Result"
+    type: RESULT
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+  - platform: pid
+    climate_id: smoker_pid
+    name: "PID Proportional"
+    type: PROPORTIONAL
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+  - platform: pid
+    climate_id: smoker_pid
+    name: "PID Integral"
+    type: INTEGRAL
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+  - platform: pid
+    climate_id: smoker_pid
+    name: "PID Derivative"
+    type: DERIVATIVE
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
 
   # Fire pot "lit" sensing, in F. Everything that decides whether the pot is lit --
   # sc_light_pot's check, firepot_monitor, the Safe Mode watchdog -- reads this, so
@@ -665,11 +757,14 @@ sensor:
           if (millis() - id(wake_lockout_ms) < 500) return;
           id(last_activity_ms) = millis();
           // Step up to the next grid point: 5 F grid below the threshold, 25 F from it up.
-          float current_temp = id(smoker_set_temp).state;
+          // Round off the C -> F conversion error so 225 F doesn't read as 224.99.
+          float current_temp = roundf((id(smoker_pid).target_temperature * 1.8f + 32.0f) * 100.0f) / 100.0f;
           float step = (current_temp < ${set_temp_coarse_from}) ? 5.0f : 25.0f;
           float new_temp = floorf(current_temp / step) * step + step;
-          if (new_temp <= id(smoker_set_temp).traits.get_max_value()) {
-            id(smoker_set_temp).publish_state(new_temp);
+          if (new_temp <= ${set_temp_max_f}) {
+            auto call = id(smoker_pid).make_call();
+            call.set_target_temperature((new_temp - 32.0f) / 1.8f);
+            call.perform();
           }
     on_anticlockwise:
       - lambda: |-
@@ -681,11 +776,13 @@ sensor:
           if (millis() - id(wake_lockout_ms) < 500) return;
           id(last_activity_ms) = millis();
           // Step down to the next grid point: 25 F grid above the threshold, 5 F at and below it.
-          float current_temp = id(smoker_set_temp).state;
+          float current_temp = roundf((id(smoker_pid).target_temperature * 1.8f + 32.0f) * 100.0f) / 100.0f;
           float step = (current_temp > ${set_temp_coarse_from}) ? 25.0f : 5.0f;
           float new_temp = ceilf(current_temp / step) * step - step;
-          if (new_temp >= id(smoker_set_temp).traits.get_min_value()) {
-            id(smoker_set_temp).publish_state(new_temp);
+          if (new_temp >= ${set_temp_min_f}) {
+            auto call = id(smoker_pid).make_call();
+            call.set_target_temperature((new_temp - 32.0f) / 1.8f);
+            call.perform();
           }
 
 # ===================== Inputs =====================
@@ -799,8 +896,6 @@ switch:
             id(igniter_mean_current).publish_state(NAN);
           }
           id(igniter_fault).publish_state(false);
-  # relay_4 removed: bessy-c only has 3 relays (K1-K3, auger/fan/igniter) -- no
-  # 4th relay net exists on this board.
   - platform: template
     name: "System ON⁄OFF"
     id: go
@@ -818,7 +913,6 @@ switch:
                 id(display_asleep) = false;
                 id(last_activity_ms) = millis();
             - script.stop: sc_shutdown   # a fresh start cancels any cooldown fan watchdog
-            - script.execute: sc_pid_control
             - switch.turn_on: fan
             - script.execute:
                 id: sc_set_state
@@ -845,134 +939,68 @@ switch:
                       new_state: ${st_off}
       - switch.turn_off: fan   # interlock keeps it running if the fire pot is hot
 
-# ===================== PID control (ported from Traeger-D1) =====================
-# Tuning knobs are exposed as numbers so they can be adjusted from Home Assistant;
-# initial values are the "really well" tuned set noted in Traeger-D1.yaml's header comment.
+# ===================== PID control =====================
+# Gains for smoker_pid, adjustable from Home Assistant. They act on the error in
+# degrees C and give a 0-1 output that heat_output scales to auger_feed_min..max.
+# Starting values are the 2026-09-28 autotune at 225 F ("Some Overshoot PID": Ku
+# 0.036, Pu 570 s), measured with feed max 0.80 and rescaled by 0.75 / 0.95 for 1.0.
 number:
   - platform: template
-    name: "PID Proportional Band"
-    id: pid_pb
-    optimistic: true
-    min_value: 10
-    max_value: 200
-    step: 1
-    restore_value: true
-    initial_value: 20.0
-    mode: box
-    icon: mdi:tune-vertical
-
-  - platform: template
-    name: "PID Ti (Reset Time)"
-    id: pid_ti
+    name: "PID Kp"
+    id: pid_kp
     optimistic: true
     min_value: 0
-    max_value: 600
-    step: 1
+    max_value: 10
+    step: 0.0001
     restore_value: true
-    initial_value: 110.0
+    initial_value: 0.0096
+    mode: box
+    icon: mdi:tune-vertical
+    on_value:
+      - lambda: id(smoker_pid).set_kp(x);
+
+  - platform: template
+    name: "PID Ki"
+    id: pid_ki
+    optimistic: true
+    min_value: 0
+    max_value: 1
+    step: 0.000001
+    restore_value: true
+    initial_value: 0.000034
     mode: box
     icon: mdi:timer-sync
+    on_value:
+      - lambda: id(smoker_pid).set_ki(x);
 
   - platform: template
-    name: "PID Td (Rate Time)"
-    id: pid_td
+    name: "PID Kd"
+    id: pid_kd
     optimistic: true
     min_value: 0
-    max_value: 120
-    step: 1
+    max_value: 500
+    step: 0.001
     restore_value: true
-    initial_value: 15.0
+    initial_value: 1.82
     mode: box
     icon: mdi:timer-outline
-
-  - platform: template
-    name: "PID Tau"
-    id: pid_tau
-    min_value: 0
-    max_value: 600
-    step: 1
-    initial_value: 300
-    optimistic: true
-    restore_value: true
-    unit_of_measurement: "s"
-
-  - platform: template
-    name: "PID Theta"
-    id: pid_theta
-    min_value: 0
-    max_value: 120
-    step: 1
-    initial_value: 12
-    optimistic: true
-    restore_value: true
-    unit_of_measurement: "s"
-    mode: box
-    icon: mdi:tune-vertical
-
-  - platform: template
-    name: "PID Center Factor"
-    id: pid_center_factor
-    min_value: 0.0
-    max_value: 1.0
-    step: 0.0001
-    initial_value: 0.0
-    optimistic: true
-    restore_value: true
-    mode: box
-    icon: mdi:tune-vertical
-
-  - platform: template
-    name: "PID Stable Window"
-    id: pid_stable_window
-    min_value: 0
-    max_value: 50
-    step: 1
-    initial_value: 8
-    optimistic: true
-    restore_value: true
-    unit_of_measurement: "°F"
-    mode: box
-    icon: mdi:tune-vertical
-
-  - platform: template
-    name: "PID Error Temp"
-    id: pid_error
-    min_value: 0
-    max_value: 600
-    step: 1
-    initial_value: 100
-    optimistic: true
-    restore_value: false
-    unit_of_measurement: "°F"
+    on_value:
+      - lambda: id(smoker_pid).set_kd(x);
 
   # Fraction of each ${auger_cycle_s} s cycle the auger runs while heating.
-  # Written by the PID; settable by hand for testing.
+  # Written by the PID through auger_feed_output; settable by hand for testing
+  # with the climate OFF.
   - platform: template
     name: "Auger Feed Rate"
     id: auger_feed_rate
     min_value: 0.0
     max_value: 1.0
     step: 0.01
-    initial_value: 0.5
+    initial_value: 0.0
     optimistic: true
-    restore_value: true
+    restore_value: false
     mode: slider
     icon: mdi:grain
-
-  - platform: template
-    name: "Smoker Set Temperature"
-    id: smoker_set_temp
-    min_value: 160
-    max_value: 550
-    step: 5
-    initial_value: 225
-    optimistic: true
-    restore_value: true
-    update_interval: 60s
-    unit_of_measurement: "°F"
-    mode: slider
-    on_value:
-      - script.execute: sc_pid_control
 
   - platform: template
     name: "Sleep Timeout"
@@ -1017,6 +1045,48 @@ number:
     mode: box
     icon: mdi:fire-alert
 
+# The autotuner measures the smoker's ultimate gain Ku and swing period Pu, then
+# applies the Ziegler-Nichols gains. The rule chosen here is applied instead, from
+# the same Ku and Pu (see the autotune interval below).
+select:
+  - platform: template
+    name: "PID Autotune Rule"
+    id: pid_autotune_rule
+    optimistic: true
+    restore_value: true
+    # Order matters: the autotune interval indexes its factor table by position.
+    options:
+      - "Ziegler-Nichols PID"
+      - "Pessen Integral PID"
+      - "Some Overshoot PID"
+      - "No Overshoot PID"
+    initial_option: "Ziegler-Nichols PID"
+    icon: mdi:tune-vertical
+
+button:
+  # Only runs while HEATING: the autotuner switches the auger between auger_feed_min
+  # and auger_feed_max to swing the chamber around the setpoint. It needs several
+  # swings -- expect an hour or more -- undisturbed by the lid or a setpoint change.
+  - platform: template
+    name: "PID Autotune"
+    id: pid_autotune_button
+    icon: mdi:auto-fix
+    on_press:
+      - if:
+          condition:
+            lambda: return id(smoker_state) == ${st_heating};
+          then:
+            - lambda: id(pid_autotune_active) = true;
+            - climate.pid.autotune:
+                id: smoker_pid
+                noiseband: ${pid_autotune_noiseband}
+                positive_output: ${pid_autotune_high_output}
+                negative_output: 0.0
+          else:
+            - logger.log:
+                level: WARN
+                format: "PID autotune only runs while heating"
+
 script:
   # Single writer for smoker_state AND status_msg. All state transitions go
   # through here; the status text is a pure function of state + display_asleep.
@@ -1028,6 +1098,15 @@ script:
       new_state: int
     then:
       - lambda: |-
+          // The PID only drives the auger while heating. Its integral keeps running
+          // while the climate is OFF, so clear it on the way into HEATING; a wake
+          // re-sends the current state, which must not clear it mid-cook.
+          if (new_state == ${st_heating} && id(smoker_state) != ${st_heating})
+            id(smoker_pid).reset_integral_term();
+          auto call = id(smoker_pid).make_call();
+          call.set_mode(new_state == ${st_heating} ? climate::CLIMATE_MODE_HEAT : climate::CLIMATE_MODE_OFF);
+          call.perform();
+
           id(smoker_state) = new_state;
           const char *msg = "Ready";
           switch (new_state) {
@@ -1110,11 +1189,16 @@ script:
           condition:
             - switch.is_on: go
           then:
-            - script.execute: sc_pid_control
             # Latch the rate for this cycle so the ON and OFF halves always sum to
             # one full cycle, even if the PID updates it mid-cycle.
             - lambda: |-
                 float rate = id(auger_feed_rate).state;
+                // No valid pit temperature -- fail safe: stop feeding pellets. The PID
+                // would otherwise hold the feed at auger_feed_min.
+                if (isnan(id(smoker_temp).state)) {
+                  ESP_LOGW("auger", "smoker_temp is NaN, failing safe (auger off)");
+                  rate = 0.0f;
+                }
                 id(auger_cycle_rate) = isnan(rate) ? 0.0f : std::clamp(rate, 0.0f, 1.0f);
             - logger.log:
                 format: "Heating cycle: feed rate=%.2f"
@@ -1125,7 +1209,6 @@ script:
                 then:
                   - switch.turn_on: auger
                   - delay: !lambda "return id(auger_cycle_rate) * ${auger_cycle_s} * 1000;"
-            - script.execute: sc_pid_control
             - switch.turn_off: auger
             - delay: !lambda "return (1.0f - id(auger_cycle_rate)) * ${auger_cycle_s} * 1000;"
 
@@ -1170,172 +1253,6 @@ script:
             - logger.log: "Smoker is now cool, turning off fan"
             - switch.turn_off: fan
             - script.stop: sc_shutdown
-
-  # PID controller, tuned via a Smith Predictor for the smoker's transport delay.
-  # Ported unchanged from Traeger-D1.yaml's sc_pid_control (only id renames: rtd_temperature_f -> smoker_temp_f).
-  - id: sc_pid_control
-    mode: single
-    then:
-      - logger.log: "sc_pid_control.STARTING"
-      - lambda: |-
-          // Configurable cycle parameters
-          const float cycle_time = ${auger_cycle_s};  // Auger cycle time in seconds
-
-          // Persistent variables
-          static float last_temp = 0.0;           // Last temperature reading
-          static unsigned long last_time = 0;     // Last timestamp in milliseconds
-          static float integral = 0.0;            // Integral term for PID
-          static float last_output = 0.0;         // Last PID output
-          static float last_error = 0.0;          // Last actual error for derivative
-          static float kp = 0.0;                  // Proportional gain
-          static float ki = 0.0;                  // Integral gain
-          static float kd = 0.0;                  // Derivative gain
-          static float set_point = 0.0;           // Current setpoint
-          static unsigned long last_set_time = 0; // Time of last setpoint change
-          static float start_change_temp = 0.0;   // Temp at last setpoint change
-          static bool new_target = false;         // Flag for new setpoint
-
-          // Get current time in milliseconds
-          unsigned long current_time = millis();
-
-          // Handle first run or invalid time
-          if (last_time == 0) {
-              last_time = current_time;
-              ESP_LOGD("PID", "Initializing: current_time = %lu", current_time);
-              return;
-          }
-
-          // Calculate time delta in seconds
-          float dt = (current_time - last_time) / 1000.0;
-          if (dt < 0.001) {
-              ESP_LOGD("PID", "dt too small: %f", dt);
-              last_time = current_time;
-              return;
-          }
-
-          // Get sensor values
-          float current_temp = id(smoker_temp_f).state;
-          if (isnan(current_temp)) {
-              // No valid pit temperature -- fail safe: stop feeding pellets.
-              ESP_LOGW("PID", "smoker_temp_f is NaN, failing safe (auger off)");
-              id(auger).turn_off();
-              last_time = current_time;
-              return;
-          }
-          float pb = id(pid_pb).state;  // Set to 50.0
-          float ti = id(pid_ti).state;  // Set to 60.0
-          float td = id(pid_td).state;  // Set to 5.0
-          float tau = id(pid_tau).state;
-          float theta = id(pid_theta).state;
-          float center_factor = id(pid_center_factor).state;  // Set to 0.0
-          float stable_window = id(pid_stable_window).state;  // Set to 10.0
-
-          // Check for setpoint change
-          float new_set_point = id(smoker_set_temp).state;
-          if (new_set_point != set_point) {
-              set_point = new_set_point;
-              last_error = 0.0;
-              integral = 0.0;
-              last_time = current_time;
-              last_set_time = current_time;
-              start_change_temp = current_temp;
-              new_target = true;
-              ESP_LOGD("PID", "New setpoint: %.3f°F", set_point);
-          }
-
-          // Calculate gains
-          if (pb != 0.0) {
-              kp = 1.0 / pb;
-          } else {
-              kp = 0.0;
-          }
-          if (ti != 0.0) {
-              ki = kp / ti;
-          } else {
-              ki = 0.0;
-          }
-          kd = kp * td;
-          ESP_LOGD("PID", "kp: %.6f, ki: %.6f, kd: %.6f", kp, ki, kd);
-
-          // Dynamic center
-          float center = set_point * center_factor;
-
-          // Smith Predictor
-          float roc = (current_temp - last_temp) / dt;
-          float predicted_temp = current_temp + (roc * theta) * (1 - exp(-dt / tau));
-          float predicted_error = set_point - predicted_temp;
-          float error = set_point - current_temp;
-
-          // PID Terms
-          float p = kp * predicted_error + center;
-          integral += predicted_error * dt;
-          integral = std::max(std::min(integral, 1000.0f), -1000.0f);  // Tighter clamp
-          float i = ki * integral;
-
-          // Derivative
-          float derv = (error - last_error) / dt;
-          if (dt <= 0) derv = 0.0;
-          float d = kd * derv;
-
-          // Calculate output
-          float u = p + i + d;
-
-          // Soften output for extreme errors
-          if (predicted_error < -150.0) {
-              u = std::min(1.0f, u - 0.3f);
-          } else if (predicted_error > 150.0) {
-              u = std::max(0.0f, u + 0.3f);
-          }
-
-          // Reset logic
-          if (new_target && fabsf(error) <= 5.0f) {
-              new_target = false;
-          }
-          if (new_target && current_time - last_set_time >= cycle_time * 3 && fabsf(error) <= fabsf(start_change_temp - set_point) / 2.0f) {
-              integral = 0.0;
-          }
-          if ((new_target && set_point < current_temp) || fabsf(error) > pb * 2) {
-              derv = 0.0;
-              d = 0.0;
-          }
-          // Soften output for small positive errors shortly after setpoint change
-          if (error < pb / 2 && error > 0 && current_time - last_set_time < cycle_time * 3) {
-              u *= 0.9;  // Less aggressive softening
-          }
-
-          // Anti-windup
-          float u_clamped = std::max(0.05f, std::min(0.80f, u));
-          if (ki != 0.0) {
-              integral += (u_clamped - u) / ki;
-              integral = std::max(std::min(integral, 1000.0f), -1000.0f);  // Tighter clamp
-          }
-          u = u_clamped;
-
-          // Reset for large integral
-          if (fabsf(integral) > 1000.0f) {  // Tighter reset
-              integral = 0.0;
-          }
-
-          // Publish states
-          id(pid_error).publish_state(error);
-          id(auger_feed_rate).publish_state(u);
-
-          // Update last values
-          last_temp = current_temp;
-          last_time = current_time;
-          last_output = u;
-          last_error = error;
-
-          // Debug logging
-          ESP_LOGD("PID", "dt: %.3f", dt);
-          ESP_LOGD("PID", "CurrentTemp: %.3f, SetPoint: %.3f, Output: %.3f",
-                  current_temp, set_point, u);
-          ESP_LOGD("PID", "P: %.3f, I: %.3f, D: %.3f, Center: %.3f", p, i, d, center);
-          ESP_LOGD("PID", "PredErr: %.3f, IntSum: %.3f, Tau: %.3f, Theta: %.3f",
-                  predicted_error, integral, tau, theta);
-          ESP_LOGD("PID", "Pb: %.3f, Ti: %.3f, Td: %.3f", pb, ti, td);
-          ESP_LOGD("PID", "StableWindow: %.3f", stable_window);
-      - logger.log: "sc_pid_control.ENDING"
 
   # Blank the display backlight after inactivity. Relays and smoker_state are
   # untouched (the inactivity timer only fires when the smoker is already idle).
@@ -1393,6 +1310,50 @@ interval:
                      (millis() - last_ok) / 1000.0f);
           }
           id(igniter_current_stale).publish_state(stale);
+
+  # PID autotune result. The autotuner writes its gains straight into smoker_pid,
+  # where a reboot would lose them. Work Ku and Pu back out of its Ziegler-Nichols
+  # gains, apply the chosen rule, and store the result in the PID numbers (whose
+  # on_value hands them back to smoker_pid).
+  - interval: 10s
+    then:
+      - lambda: |-
+          if (!id(pid_autotune_active))
+            return;
+          const float kp = id(smoker_pid).get_kp();
+          const float ki = id(smoker_pid).get_ki();
+          const float kd = id(smoker_pid).get_kd();
+          if (kp == id(pid_kp).state && ki == id(pid_ki).state && kd == id(pid_kd).state)
+            return;   // still running
+          id(pid_autotune_active) = false;
+          if (!(kp > 0.0f && ki > 0.0f)) {
+            ESP_LOGW("autotune", "Unusable result kp=%.5f ki=%.6f, keeping the old gains", kp, ki);
+            id(smoker_pid).set_kp(id(pid_kp).state);
+            id(smoker_pid).set_ki(id(pid_ki).state);
+            id(smoker_pid).set_kd(id(pid_kd).state);
+            return;
+          }
+          // Ziegler-Nichols PID: kp = 0.6 Ku, ki = 1.2 Ku / Pu, kd = 0.075 Ku Pu
+          const float ku = kp / 0.6f;
+          const float pu = 1.2f * ku / ki;
+          // {kp, ki, kd} factors, in pid_autotune_rule option order.
+          static const float rules[][3] = {
+              {0.6f, 1.2f, 0.075f},      // Ziegler-Nichols PID
+              {0.7f, 1.75f, 0.105f},     // Pessen Integral PID
+              {0.333f, 0.667f, 0.111f},  // Some Overshoot PID
+              {0.2f, 0.4f, 0.0625f},     // No Overshoot PID
+          };
+          const size_t r = id(pid_autotune_rule).active_index().value_or(0);
+          const float new_kp = rules[r][0] * ku;
+          const float new_ki = rules[r][1] * ku / pu;
+          const float new_kd = rules[r][2] * ku * pu;
+          ESP_LOGI("autotune", "Ku=%.5f Pu=%.0f s, rule '%s': kp=%.5f ki=%.6f kd=%.4f", ku, pu,
+                   id(pid_autotune_rule).option_at(r), new_kp, new_ki, new_kd);
+          id(pid_kp).make_call().set_value(new_kp).perform();
+          id(pid_ki).make_call().set_value(new_ki).perform();
+          id(pid_kd).make_call().set_value(new_kd).perform();
+          // The integral kept running under the old gains throughout the autotune.
+          id(smoker_pid).reset_integral_term();
 
   # Firepot watchdog: while actively heating, if lit_sense_f stays below the lit
   # threshold longer than firepot_fail_timeout, drop into Safe Mode.
