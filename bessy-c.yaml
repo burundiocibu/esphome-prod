@@ -239,7 +239,7 @@ climate:
       min_temperature: ${set_temp_min_f}°F
       max_temperature: ${set_temp_max_f}°F
       temperature_step:
-        target_temperature: 0.5
+        target_temperature: 5.0
         current_temperature: 0.1
     control_parameters:
       kp: 0.0096
@@ -770,6 +770,14 @@ sensor:
 
 # ===================== Inputs =====================
 binary_sensor:
+  # On from the PID Autotune button press until its result is stored in the PID
+  # numbers. An autotune left unfinished when the cook ends stays on until reboot.
+  - platform: template
+    name: "PID Autotune Running"
+    id: pid_autotune_running
+    icon: mdi:auto-fix
+    lambda: return id(pid_autotune_active);
+
   # Igniter commanded on but drawing no real current -- open element, failed relay or
   # a loose wire. delayed_on needs two consecutive bad samples, so one odd reading
   # cannot raise it. Reporting only; nothing acts on it yet.
