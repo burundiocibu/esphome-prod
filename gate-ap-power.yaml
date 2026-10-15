@@ -67,8 +67,6 @@ sensor:
       name: "Battery current"
     load_current: 
       name: "load_current"
-    state_of_charge:
-      name: soc
 
 text_sensor:
   - platform: victron
