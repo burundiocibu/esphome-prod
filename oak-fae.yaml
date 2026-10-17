@@ -3,6 +3,7 @@ substitutions:
 
 esphome:
   name: ${me}
+  comment: seeed xiao
 
 esp32:
   board: seeed_xiao_esp32c6
