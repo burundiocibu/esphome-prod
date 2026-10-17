@@ -1,0 +1,105 @@
+# Bring-up / checkout config for the bms-mon PCBA (~/git/kicad/bms-mon)
+#
+# U1 XIAO ESP32-C6, U3 INA226 (A0=A1=VS -> 0x45) with R3 0.1 ohm high-side shunt
+# between J1 pin 1 and the U2 LDO input. INA226 VBUS is the LDO input (after shunt).
+#
+# J3 header: 1 GND, 2 +3.3V, 3 Vbat, 4 GPIO2, 5 GPIO21, 6 GPIO22, 7 GPIO23,
+#            8 GPIO16, 9 GPIO18, 10 GPIO20, 11 GPIO19, 12 GPIO17
+# Each J3 GPIO is an input with pull-up; jumper it to J3 pin 1 (GND) and watch it go ON.
+
+substitutions:
+  me: vtest
+
+esphome:
+  name: ${me}
+
+esp32:
+  board: seeed_xiao_esp32c6
+  framework:
+    type: esp-idf
+
+logger:
+  level: DEBUG
+
+api:
+  encryption:
+    key: !secret esp_api_key
+
+ota:
+  - platform: esphome
+    password: !secret esp_ota_pw
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+web_server:
+  version: 3
+
+i2c:
+  sda: GPIO0
+  scl: GPIO1
+  scan: true
+  frequency: 400kHz
+
+sensor:
+  - platform: ina226
+    address: 0x45
+    shunt_resistance: 0.1 ohm
+    max_current: 0.8A
+    update_interval: 5s
+    bus_voltage:
+      name: ${me} bus voltage
+    shunt_voltage:
+      name: ${me} shunt voltage
+    current:
+      name: ${me} current
+      accuracy_decimals: 4
+    power:
+      name: ${me} power
+
+  - platform: wifi_signal
+    name: ${me} wifi signal
+    update_interval: 30s
+
+  - platform: uptime
+    name: ${me} uptime
+    update_interval: 30s
+
+light:
+  # XIAO onboard user LED, active low
+  - platform: status_led
+    name: ${me} status led
+    pin:
+      number: GPIO15
+      inverted: true
+      ignore_strapping_warning: true
+
+binary_sensor:
+  - platform: gpio
+    name: J3-4 GPIO2
+    pin: {number: GPIO2, inverted: true, mode: {input: true, pullup: true}}
+  - platform: gpio
+    name: J3-5 GPIO21
+    pin: {number: GPIO21, inverted: true, mode: {input: true, pullup: true}}
+  - platform: gpio
+    name: J3-6 GPIO22
+    pin: {number: GPIO22, inverted: true, mode: {input: true, pullup: true}}
+  - platform: gpio
+    name: J3-7 GPIO23
+    pin: {number: GPIO23, inverted: true, mode: {input: true, pullup: true}}
+  - platform: gpio
+    name: J3-8 GPIO16
+    pin: {number: GPIO16, inverted: true, mode: {input: true, pullup: true}}
+  - platform: gpio
+    name: J3-9 GPIO18
+    pin: {number: GPIO18, inverted: true, mode: {input: true, pullup: true}}
+  - platform: gpio
+    name: J3-10 GPIO20
+    pin: {number: GPIO20, inverted: true, mode: {input: true, pullup: true}}
+  - platform: gpio
+    name: J3-11 GPIO19
+    pin: {number: GPIO19, inverted: true, mode: {input: true, pullup: true}}
+  - platform: gpio
+    name: J3-12 GPIO17
+    pin: {number: GPIO17, inverted: true, mode: {input: true, pullup: true}}
