@@ -30,6 +30,15 @@ prometheus:
 web_server:
   version: 3
 
+esp32_ble_tracker:
+  scan_parameters:
+    interval: 1100ms
+    window: 1100ms
+    active: false
+
+bluetooth_proxy:
+  active: true
+
 # https://github.com/KinDR007/VictronMPPT-ESPHOME
 external_components:
   - source: github://KinDR007/VictronMPPT-ESPHOME@main
