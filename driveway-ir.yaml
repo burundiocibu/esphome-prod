@@ -29,7 +29,7 @@ api:
 
 ota:
   - platform: esphome
-    password: !secret esp_ota_pw
+    encryption:
     id: my_ota
 
 time:
