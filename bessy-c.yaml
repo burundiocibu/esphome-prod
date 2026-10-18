@@ -189,8 +189,6 @@ wifi:
     ssid: ${me} Fallback Hotspot
     password: "n84gt5ei4aAb"
 
-captive_portal:
-
 web_server:
   port: 80
   version: 2
