@@ -61,6 +61,34 @@ sensor:
     name: uptime
     update_interval: 5s
 
+  - platform: openthread_info
+    parent_average_rssi:
+      name: "Thread Parent Average RSSI"
+    parent_last_rssi:
+      name: "Thread Parent Last RSSI"
+    parent_link_quality_in:
+      name: "Thread Parent Link Quality In"
+    parent_link_quality_out:
+      name: "Thread Parent Link Quality Out"
+    tx_total:
+      name: "Thread TX Total"
+    tx_retries:
+      name: "Thread TX Retries"
+    tx_err_cca:
+      name: "Thread TX CCA Errors"
+    tx_err_abort:
+      name: "Thread TX Abort Errors"
+    rx_total:
+      name: "Thread RX Total"
+    rx_err_fcs:
+      name: "Thread RX FCS Errors"
+    attach_attempts:
+      name: "Thread Attach Attempts"
+    parent_changes:
+      name: "Thread Parent Changes"
+    partition_id_changes:
+      name: "Thread Partition ID Changes"
+
 text_sensor:
   - platform: openthread_info
     ip_address:
