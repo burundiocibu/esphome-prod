@@ -3,10 +3,10 @@ substitutions:
 
 esphome:
   name: ${me}
-  comment: supermini esp32h2
+  comment: seeed xiao esp32c6
 
 esp32:
-  variant: ESP32H2
+  board: seeed_xiao_esp32c6
   framework:
     type: esp-idf
 
@@ -22,6 +22,9 @@ ota:
     encryption:
     id: my_ota
 
+web_server:
+  version: 3
+
 network:
   enable_ipv6: true
 
@@ -35,12 +38,20 @@ external_components:
   - source:
       type: local
       path: components
-    components: [max17048, openthread_rssi]
+    components: [openthread_rssi]
 
-i2c:
-  sda: 14 # qwiic green
-  scl: 12 # qwiic yellow
-  frequency: 100kHz
+# XIAO C6 RF switch: GPIO3 low powers it, GPIO14 low selects the onboard antenna
+switch:
+  - platform: gpio
+    id: rf_switch_enable
+    pin: GPIO3
+    restore_mode: ALWAYS_OFF
+    internal: true
+  - platform: gpio
+    id: rf_antenna_select
+    pin: GPIO14
+    restore_mode: ALWAYS_ON
+    internal: true
 
 openthread_rssi:
   update_interval: 15s
@@ -49,14 +60,6 @@ sensor:
   - platform: uptime
     name: uptime
     update_interval: 5s
-    
-  - platform: max17048
-    id: max17048_id
-    update_interval: 60s
-    battery_voltage:
-      name: "Battery Voltage"
-    battery_level:
-      name: "Battery"
 
 text_sensor:
   - platform: openthread_info
