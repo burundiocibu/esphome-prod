@@ -11,12 +11,6 @@ esphome:
       - script.execute: sensor_update_loop
 
 external_components:
-  - source: github://pr#12325
-    components: [power_management]
-    refresh: 1h
-  - source: github://pr#11766
-    components: [openthread]
-    refresh: 1h
   - source:
       type: local
       path: components
@@ -56,11 +50,12 @@ i2c:
   frequency: 100kHz
 
 power_management:
-  id: pm_id
-  enable_light_sleep: true
-  power_down_flash: true
-  power_down_peripherals: false
-  profiling: true
+  - platform: esp32_power_management
+    id: pm_id
+    enable_light_sleep: true
+    power_down_flash: true
+    power_down_peripherals: false
+    profiling: true
 
 sensor:
   - platform: uptime
@@ -116,6 +111,9 @@ sensor:
       name: "Battery"
 
 switch:
+  - platform: restart
+    name: restart
+
   - platform: template
     id: radio_always_on
     name: "Radio Always On"
@@ -124,12 +122,12 @@ switch:
     turn_on_action:
       then:
         - logger.log: "Set Radio Always On"
-        - openthread.pollperiod: 0s
+        - openthread.set_poll_period: 0s
 
     turn_off_action:
       then:
         - logger.log: "Set Radio Off When Idle"
-        - openthread.pollperiod: !lambda "return (uint32_t)(id(sensor_interval).state * 1000);"
+        - openthread.set_poll_period: !lambda "return (uint32_t)(id(sensor_interval).state * 1000);"
 
 number:
   - platform: template
@@ -148,7 +146,7 @@ number:
             condition:
               switch.is_off: radio_always_on
             then:
-              - openthread.pollperiod: !lambda "return (uint32_t)(x * 1000);"
+              - openthread.set_poll_period: !lambda "return (uint32_t)(x * 1000);"
         - script.stop: sensor_update_loop
         - script.execute: sensor_update_loop
 

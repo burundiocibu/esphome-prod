@@ -1,11 +1,11 @@
 #pragma once
 
-#include "esphome/components/nau7802/nau7802.h"
+#include "nau7802_base.h"
 
 namespace esphome {
 namespace nau7802_local {
 
-class NAU7802LocalSensor : public nau7802::NAU7802Sensor {
+class NAU7802LocalSensor : public NAU7802Base {
  public:
   void setup() override;
   void update() override;

@@ -32,7 +32,7 @@ static const uint32_t WAKE_DELAY_MS = 800;
 static const uint32_t TEMP_DELAY_MS = 600;
 
 void NAU7802LocalSensor::setup() {
-  nau7802::NAU7802Sensor::setup();
+  NAU7802Base::setup();
   this->set_timeout("nau7802_local_setup", WAKE_DELAY_MS, [this]() {
     if (this->is_failed())
       return;
@@ -53,7 +53,7 @@ void NAU7802LocalSensor::update() {
   i2c::I2CRegister pu_ctrl = this->reg(PU_CTRL_REG);
   if (!(pu_ctrl.get() & PU_CTRL_POWERUP_DIGITAL)) {
     ESP_LOGW(TAG, "Chip lost state (PUD=0); re-initializing");
-    nau7802::NAU7802Sensor::setup();
+    NAU7802Base::setup();
     this->busy_ = false;
     return;
   }
@@ -65,7 +65,7 @@ void NAU7802LocalSensor::update() {
       this->busy_ = false;
       return;
     }
-    nau7802::NAU7802Sensor::update();
+    NAU7802Base::update();
 
     if (this->temperature_sensor_ != nullptr) {
       this->read_temperature_();

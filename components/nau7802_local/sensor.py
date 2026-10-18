@@ -1,6 +1,5 @@
 import esphome.codegen as cg
 from esphome.components import i2c, sensor
-from esphome.components.nau7802 import sensor as base_sensor
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_GAIN,
@@ -13,7 +12,6 @@ from esphome.const import (
 )
 
 DEPENDENCIES = ["i2c"]
-AUTO_LOAD = ["nau7802"]
 
 CONF_GAIN_CALIBRATION = "gain_calibration"
 CONF_OFFSET_CALIBRATION = "offset_calibration"
@@ -21,9 +19,45 @@ CONF_LDO_VOLTAGE = "ldo_voltage"
 CONF_SAMPLES_PER_SECOND = "samples_per_second"
 
 nau7802_local_ns = cg.esphome_ns.namespace("nau7802_local")
-NAU7802LocalSensor = nau7802_local_ns.class_(
-    "NAU7802LocalSensor", base_sensor.NAU7802Sensor
+NAU7802Base = nau7802_local_ns.class_(
+    "NAU7802Base", sensor.Sensor, cg.PollingComponent, i2c.I2CDevice
 )
+NAU7802LocalSensor = nau7802_local_ns.class_("NAU7802LocalSensor", NAU7802Base)
+
+NAU7802Gain = nau7802_local_ns.enum("NAU7802Gain")
+GAINS = {
+    128: NAU7802Gain.NAU7802_GAIN_128,
+    64: NAU7802Gain.NAU7802_GAIN_64,
+    32: NAU7802Gain.NAU7802_GAIN_32,
+    16: NAU7802Gain.NAU7802_GAIN_16,
+    8: NAU7802Gain.NAU7802_GAIN_8,
+    4: NAU7802Gain.NAU7802_GAIN_4,
+    2: NAU7802Gain.NAU7802_GAIN_2,
+    1: NAU7802Gain.NAU7802_GAIN_1,
+}
+
+NAU7802SPS = nau7802_local_ns.enum("NAU7802SPS")
+SAMPLES_PER_SECOND = {
+    320: NAU7802SPS.NAU7802_SPS_320,
+    80: NAU7802SPS.NAU7802_SPS_80,
+    40: NAU7802SPS.NAU7802_SPS_40,
+    20: NAU7802SPS.NAU7802_SPS_20,
+    10: NAU7802SPS.NAU7802_SPS_10,
+}
+
+NAU7802LDO = nau7802_local_ns.enum("NAU7802LDO")
+LDO = {
+    "2.4V": NAU7802LDO.NAU7802_LDO_2V4,
+    "2.7V": NAU7802LDO.NAU7802_LDO_2V7,
+    "3.0V": NAU7802LDO.NAU7802_LDO_3V0,
+    "3.3V": NAU7802LDO.NAU7802_LDO_3V3,
+    "3.6V": NAU7802LDO.NAU7802_LDO_3V6,
+    "3.9V": NAU7802LDO.NAU7802_LDO_3V9,
+    "4.2V": NAU7802LDO.NAU7802_LDO_4V2,
+    "4.5V": NAU7802LDO.NAU7802_LDO_4V5,
+    "EXTERNAL": NAU7802LDO.NAU7802_LDO_EXTERNAL,
+    "EXT": NAU7802LDO.NAU7802_LDO_EXTERNAL,
+}
 
 CONFIG_SCHEMA = (
     sensor.sensor_schema(
@@ -35,12 +69,12 @@ CONFIG_SCHEMA = (
     .extend(
         {
             cv.Optional(CONF_LDO_VOLTAGE, default="3.0V"): cv.enum(
-                base_sensor.LDO, upper=True
+                LDO, upper=True
             ),
             cv.Optional(CONF_SAMPLES_PER_SECOND, default=10): cv.enum(
-                base_sensor.SAMPLES_PER_SECOND, int=True
+                SAMPLES_PER_SECOND, int=True
             ),
-            cv.Optional(CONF_GAIN, default=128): cv.enum(base_sensor.GAINS, int=True),
+            cv.Optional(CONF_GAIN, default=128): cv.enum(GAINS, int=True),
             cv.Optional(CONF_OFFSET_CALIBRATION, default=0): cv.int_range(
                 min=-8388608, max=8388607
             ),
