@@ -141,7 +141,7 @@ sensor:
   - platform: template
     name: ${me} avg current
     id: avg_current
-    lambda: "return id(ina_current).raw_state;"
+    lambda: "return id(ina_current).get_raw_state();"
     update_interval: 3000ms
     accuracy_decimals: 5
     unit_of_measurement: mA
@@ -154,7 +154,7 @@ sensor:
   - platform: template
     name: ${me} max current
     id: max_current
-    lambda: "return id(ina_current).raw_state;"
+    lambda: "return id(ina_current).get_raw_state();"
     update_interval: 100ms
     accuracy_decimals: 3
     unit_of_measurement: mA
@@ -167,7 +167,7 @@ sensor:
   - platform: template
     name: ${me} min current
     id: min_current
-    lambda: "return id(ina_current).raw_state;"
+    lambda: "return id(ina_current).get_raw_state();"
     update_interval: 100ms
     accuracy_decimals: 3
     unit_of_measurement: mA
