@@ -55,6 +55,7 @@ globals:
 button:
   - platform: template
     name: "Reset counters"
+    id: reset_counters
     on_press:
       - lambda: |-
           id(ina288).reset_energy_counters();
@@ -91,8 +92,14 @@ binary_sensor:
     pin: GPIO2
     id: D2_button
   - platform: gpio
-    pin: GPIO0
+    pin:
+      number: GPIO0
+      inverted: true
     id: D0_button
+    filters:
+      - delayed_on: 20ms
+    on_press:
+      - button.press: reset_counters
 
 sensor:
   - platform: uptime
