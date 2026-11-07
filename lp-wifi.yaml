@@ -25,7 +25,6 @@ esp32:
 
 logger:
   level: INFO
-  baud_rate: 0
 
 wifi:
   ssid: !secret wifi_ssid
@@ -55,6 +54,10 @@ power_management:
     power_down_peripherals: true
     profiling: true
 
+one_wire:
+  - platform: gpio
+    pin: GPIO18
+
 switch:
   - platform: restart
     name: restart
@@ -66,3 +69,16 @@ sensor:
   - platform: wifi_signal
     name: ${me} wifi signal
     update_interval: 15s
+  # 2:1 resistor divider from the battery on D0
+  - platform: adc
+    pin: GPIO0
+    name: ${me} battery voltage
+    attenuation: 12db
+    samples: 8
+    update_interval: 60s
+    accuracy_decimals: 2
+    filters:
+      - multiply: 2.0
+  - platform: dallas_temp
+    name: ${me} temperature
+    update_interval: 60s
