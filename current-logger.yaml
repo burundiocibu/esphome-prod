@@ -228,15 +228,21 @@ display:
     rotation: 270
     update_interval: 1s
     lambda: |-
-      it.printf(1, 0, id(roboto_18), id(white), "current: %.1f, %.2f mA avg",
+      // Draw the label in red and return the x position for its value.
+      auto label = [&](int y, const char *text) -> int {
+        int x1, y1, width, height;
+        it.get_text_bounds(1, y, text, id(roboto_18), display::TextAlign::TOP_LEFT, &x1, &y1, &width, &height);
+        it.print(1, y, id(roboto_18), id(red), text);
+        return 1 + width;
+      };
+      it.printf(label(0, "current: "), 0, id(roboto_18), id(white), "%.1f, %.2f mA avg",
           id(ina_current).state, id(mean_current).state);
-      it.printf(1, 20, id(roboto_18), id(white), "voltage: %6.2f V",
+      it.printf(label(20, "voltage: "), 20, id(roboto_18), id(white), "%6.2f V",
           id(buss_v).state);
-      it.printf(1, 40, id(roboto_18), id(white), "energy: %6.2f Wh",
+      it.printf(label(40, "energy: "), 40, id(roboto_18), id(white), "%6.2f Wh",
           id(energy).state);
       unsigned elapsed_s = (millis() - id(counters_reset_ms)) / 1000;
-      it.printf(1, 60, id(roboto_18), id(white), "elapsed: %u:%02u:%02u",
+      it.printf(label(60, "elapsed: "), 60, id(roboto_18), id(white), "%u:%02u:%02u",
           elapsed_s / 3600, (elapsed_s / 60) % 60, elapsed_s % 60);
-      it.printf(1, 80, id(roboto_18), id(white), "battery: %3.1f %% , %4.2f V",
+      it.printf(label(80, "battery: "), 80, id(roboto_18), id(white), "%3.1f %% , %4.2f V",
           id(battery_level).state, id(battery_voltage).state);
-
