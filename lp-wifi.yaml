@@ -66,3 +66,12 @@ sensor:
   - platform: wifi_signal
     name: ${me} wifi signal
     update_interval: 15s
+  - platform: adc
+    pin: GPIO0
+    name: ${me} battery voltage
+    attenuation: 12db
+    samples: 8
+    update_interval: 60s
+    accuracy_decimals: 2
+    filters:
+      - multiply: 2.0
