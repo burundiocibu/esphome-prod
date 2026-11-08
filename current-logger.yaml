@@ -6,12 +6,16 @@ esphome:
   name: ${me}
   comment: adafruit esp32-s3-reverse-tft-feather
   on_boot:
-    # Power the STEMMA QT port and give it time to start before the I2C sensors are set up (priority 600).
-    priority: 700
-    then:
-      - output.turn_on: tfti2c_pwr
-      - lambda: delay(50);
-      - output.turn_on: tft_backlight
+    - priority: 1100
+      then:
+        # Power the STEMMA QT port and I2C pull-ups before the I2C bus is set up (priority 1000).
+        - lambda: |-
+            gpio_reset_pin(GPIO_NUM_7);
+            gpio_set_direction(GPIO_NUM_7, GPIO_MODE_OUTPUT);
+            gpio_set_level(GPIO_NUM_7, 1);
+            delay(50);
+    - then:
+        - output.turn_on: tft_backlight
 
 esp32:
   board: adafruit_feather_esp32s3_tft
@@ -75,10 +79,6 @@ spi:
   miso_pin: GPIO37
 
 output:
-  - platform: gpio
-    pin: GPIO7
-    id: tfti2c_pwr
-
   - platform: gpio
     pin: GPIO45
     id: tft_backlight
