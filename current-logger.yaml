@@ -5,7 +5,9 @@ substitutions:
 esphome:
   name: ${me}
   comment: adafruit esp32-s3-reverse-tft-feather
-  on_boot: 
+  on_boot:
+    # Power the STEMMA QT port before the I2C sensors are set up (priority 600).
+    priority: 700
     then:
       - output.turn_on: tfti2c_pwr
       - output.turn_on: tft_backlight
