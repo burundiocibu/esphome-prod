@@ -4,6 +4,16 @@ substitutions:
 esphome:
   name: ${me}
   comment: seeed xiao
+  on_boot:
+    priority: 800
+    then:
+      - lambda: |-
+          for (gpio_num_t pin : {GPIO_NUM_3, GPIO_NUM_14}) {
+            gpio_reset_pin(pin);
+            gpio_set_direction(pin, GPIO_MODE_OUTPUT);
+            gpio_set_level(pin, 0);
+            gpio_hold_en(pin);
+          }
 
 esp32:
   board: seeed_xiao_esp32c6
