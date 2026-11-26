@@ -1425,7 +1425,7 @@ interval:
           if (now - id(pot_below_since_ms) > (uint32_t) (id(firepot_fail_timeout).state * 1000.0f)) {
             ESP_LOGW("firepot", "Lit sensor below %.0f F for too long -> Safe Mode", lit_f);
             char buf[96];
-            uint32_t secs = (now - id(pot_below_since_ms)) / 1000;
+            unsigned int secs = (now - id(pot_below_since_ms)) / 1000;
             if (isnan(sense_f)) {
               snprintf(buf, sizeof(buf), "Safe Mode: pot NaN for %us (need=%.0f F)", secs, lit_f);
             } else {
