@@ -100,6 +100,9 @@ logger:
     ads1115: INFO
     ads1115.sensor: INFO
 
+debug:
+  update_interval: 60s
+
 globals:
   # Timestamp (millis) of the last user input; drives the Asleep inactivity timeout.
   - id: last_activity_ms
@@ -172,8 +175,15 @@ globals:
     type: float
     restore_value: no
     initial_value: '0.0f'
+  # Reason staged by an internal caller right before turning `go` off, so
+  # go.on_turn_off can publish it to last_stop_reason (or "External" if empty).
+  - id: pending_off_reason
+    type: std::string
+    restore_value: no
+    initial_value: '""'
 
 api:
+  reboot_timeout: 0s   # keep cooking even if Home Assistant is unreachable
   encryption:
     key: !secret esp_api_key
 
@@ -185,6 +195,7 @@ ota:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  reboot_timeout: 0s   # keep cooking even if WiFi drops out
   ap:
     ssid: ${me} Fallback Hotspot
     password: "n84gt5ei4aAb"
@@ -355,14 +366,33 @@ text_sensor:
   - platform: version
     name: ${me} ESPHome Version
 
+  - platform: debug
+    reset_reason:
+      name: "Reset Reason"
+      id: reset_reason
+
   - platform: template
     name: "Status Message"
     id: status_msg
+
+  - platform: template
+    name: "Last Stop Reason"
+    id: last_stop_reason
+    entity_category: diagnostic
+    update_interval: never
 
 sensor:
   - platform: uptime
     name: ${me} uptime
     update_interval: 120s
+
+  - platform: debug
+    free:
+      name: "Heap Free"
+    block:
+      name: "Heap Max Block"
+    loop_time:
+      name: "Loop Time"
 
   # MCP9600 thermocouple amp on shared I2C bus (MAX31855 SPI didn't play nice with the display)
   - platform: mcp9600
@@ -623,6 +653,10 @@ sensor:
                       - lambda: "return x > ${fan_cooldown_temp_f};"
                   then:
                     - logger.log: "Hot startup - Fan ON"
+                    - lambda: |-
+                        char buf[96];
+                        snprintf(buf, sizeof(buf), "Reboot while hot (pot=%.0f F)", x);
+                        id(last_stop_reason).publish_state(buf);
                     - switch.turn_on: fan
                     - script.execute:
                         id: sc_set_state
@@ -824,7 +858,9 @@ binary_sensor:
               then:
                 - script.execute: sc_wake   # swallow: button just wakes
               else:
-                - lambda: id(last_activity_ms) = millis();
+                - lambda: |-
+                    id(last_activity_ms) = millis();
+                    id(pending_off_reason) = "Encoder long press";
                 - logger.log: "Encoder long press - stopping smoker"
                 - switch.turn_off: go
 
@@ -908,7 +944,13 @@ switch:
                 new_state: ${st_lighting}
             - script.execute: sc_light_pot
     on_turn_off:
-      - logger.log: "System turned OFF"
+      - lambda: |-
+          std::string reason = id(pending_off_reason).empty()
+              ? "External (API or Web UI)"
+              : id(pending_off_reason);
+          id(pending_off_reason).clear();
+          ESP_LOGI("state", "System turned OFF: %s", reason.c_str());
+          id(last_stop_reason).publish_state(reason);
       - script.execute: sc_stop_all_smoking
       - if:
           # SAFE is latched: leave the state (and "Safe Mode" text) alone.
@@ -1168,6 +1210,16 @@ script:
                   - switch.turn_off: igniter
                 else:
                   - logger.log: "Lit sensor never rose to the lit threshold -> Safe Mode"
+                  - lambda: |-
+                      char buf[96];
+                      float f = id(lit_sense_f).state;
+                      float need = id(lighting_start_temp_f) + id(lit_rise_f).state;
+                      if (isnan(f)) {
+                        snprintf(buf, sizeof(buf), "Safe Mode: failed to light (pot=NaN, need=%.0f F)", need);
+                      } else {
+                        snprintf(buf, sizeof(buf), "Safe Mode: failed to light (pot=%.0f F, need=%.0f F)", f, need);
+                      }
+                      id(pending_off_reason) = buf;
                   - script.execute: sc_enter_safe_mode
 
   - id: sc_pot_heating
@@ -1218,6 +1270,10 @@ script:
     mode: single
     then:
       - logger.log: "ENTERING SAFE MODE: firepot fault"
+      - lambda: |-
+          if (id(pending_off_reason).empty()) {
+            id(pending_off_reason) = "Safe Mode: firepot fault";
+          }
       - script.execute:
           id: sc_set_state
           new_state: ${st_safe}
@@ -1368,6 +1424,14 @@ interval:
           }
           if (now - id(pot_below_since_ms) > (uint32_t) (id(firepot_fail_timeout).state * 1000.0f)) {
             ESP_LOGW("firepot", "Lit sensor below %.0f F for too long -> Safe Mode", lit_f);
+            char buf[96];
+            uint32_t secs = (now - id(pot_below_since_ms)) / 1000;
+            if (isnan(sense_f)) {
+              snprintf(buf, sizeof(buf), "Safe Mode: pot NaN for %us (need=%.0f F)", secs, lit_f);
+            } else {
+              snprintf(buf, sizeof(buf), "Safe Mode: pot %.0f F < %.0f F for %us", sense_f, lit_f, secs);
+            }
+            id(pending_off_reason) = buf;
             id(sc_enter_safe_mode).execute();
           }
 
